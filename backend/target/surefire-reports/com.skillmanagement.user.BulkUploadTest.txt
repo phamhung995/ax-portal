@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.skillmanagement.user.BulkUploadTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.980 s -- in com.skillmanagement.user.BulkUploadTest

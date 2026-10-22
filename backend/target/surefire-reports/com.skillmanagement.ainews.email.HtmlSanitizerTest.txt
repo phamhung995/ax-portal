@@ -1,0 +1,56 @@
+-------------------------------------------------------------------------------
+Test set: com.skillmanagement.ainews.email.HtmlSanitizerTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 0.017 s <<< FAILURE! -- in com.skillmanagement.ainews.email.HtmlSanitizerTest
+com.skillmanagement.ainews.email.HtmlSanitizerTest.stripsDangerousElements -- Time elapsed: 0.009 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "<div>
+ a
+</div>"
+to contain:
+  "<div>a</div>" 
+	at com.skillmanagement.ainews.email.HtmlSanitizerTest.stripsDangerousElements(HtmlSanitizerTest.java:34)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+com.skillmanagement.ainews.email.HtmlSanitizerTest.stripsEventHandlers -- Time elapsed: 0.001 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "<img>
+<a>link</a>"
+to contain:
+  "a.png" 
+	at com.skillmanagement.ainews.email.HtmlSanitizerTest.stripsEventHandlers(HtmlSanitizerTest.java:45)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+com.skillmanagement.ainews.email.HtmlSanitizerTest.keepsDisplayMarkup -- Time elapsed: 0.001 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "<h2>Title</h2>
+<p>Para</p>
+<table>
+ <tbody>
+  <tr>
+   <td>Cell</td>
+  </tr>
+ </tbody>
+</table>
+<ul>
+ <li>Item</li>
+</ul>
+<a href="https://example.com">link</a>
+<img>"
+to contain:
+  "pic.png" 
+	at com.skillmanagement.ainews.email.HtmlSanitizerTest.keepsDisplayMarkup(HtmlSanitizerTest.java:70)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+

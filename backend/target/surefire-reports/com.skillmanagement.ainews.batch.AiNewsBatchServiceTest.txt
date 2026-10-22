@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.skillmanagement.ainews.batch.AiNewsBatchServiceTest
+-------------------------------------------------------------------------------
+Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.101 s -- in com.skillmanagement.ainews.batch.AiNewsBatchServiceTest

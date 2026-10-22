@@ -6,9 +6,9 @@ spring:
   # Real credentials live in application-local.yml (gitignored) or env vars
   # DB_HOST / DB_PORT / DB_NAME / DB_USERNAME / DB_PASSWORD.
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:107.120.93.231}:${DB_PORT:5432}/${DB_NAME:skill_manager}}
-    username: ${DB_USERNAME:svcepc}
-    password: ${DB_PASSWORD:Sep@2026}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:skill_manager}}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin}
 
   jpa:
     hibernate:
