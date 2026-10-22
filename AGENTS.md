@@ -1,0 +1,1 @@
+Sử dụng ripgrep thay vì các công cụ đọc mặc định của windows khi phải thực thi trên những file có dung lượng lớn
