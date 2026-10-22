@@ -1,0 +1,70 @@
+services:
+  # ======================== PostgreSQL ========================
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: skill-mgmt-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-skill_management_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d skill_management_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skill-mgmt-network
+
+  # ======================== Backend (Spring Boot) ========================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: skill-mgmt-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-skill_management_db}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-ZGV2LW9ubHktc2VjcmV0LWtleS1tdXN0LWNoYW5nZS1pbi1wcm9kdWN0aW9u}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - skill-mgmt-network
+
+  # ======================== Frontend (Vue + Nginx) ========================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: skill-mgmt-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - skill-mgmt-network
+
+volumes:
+  pgdata:
+  backend_uploads:
+
+networks:
+  skill-mgmt-network:
+    driver: bridge

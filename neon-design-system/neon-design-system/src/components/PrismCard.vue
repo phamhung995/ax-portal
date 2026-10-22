@@ -1,0 +1,2 @@
+<script setup>defineProps({ title: String, eyebrow: String, description: String })</script>
+<template><article class="p-card p-glass"><header v-if="title || eyebrow || $slots.header"><slot name="header"><span v-if="eyebrow" class="p-eyebrow">{{ eyebrow }}</span><h3 v-if="title">{{ title }}</h3><p v-if="description">{{ description }}</p></slot></header><slot /><footer v-if="$slots.footer"><slot name="footer" /></footer></article></template>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Skill Management — Sitemap Tree</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; display: flex; justify-content: center; padding: 30px 20px; }
+        .wrap { max-width: 1400px; width: 100%; }
+        .title { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 6px; color: #f1f5f9; }
+        .subtitle { font-size: 12px; color: #64748b; text-align: center; margin-bottom: 6px; }
+        .hint { font-size: 11px; color: #818cf8; text-align: center; margin-bottom: 22px; }
+
+        /* Node types */
+        .nd { border-radius: 8px; padding: 10px 18px; text-align: center; font-size: 12px; font-weight: 600; white-space: nowrap; position: relative; }
+        .nd h5 { font-size: 12px; font-weight: 600; }
+        .nd .s { font-size: 10px; color: #94a3b8; font-weight: 400; margin-top: 1px; }
+
+        .n-root { background: #0c4a6e; border: 2px solid #0ea5e9; border-radius: 24px; padding: 14px 28px; }
+        .n-root h5 { font-size: 14px; }
+        .n-start { background: #064e3b; border: 2px solid #059669; border-radius: 20px; }
+        .n-screen { background: #1e293b; border: 2px solid #475569; }
+        .n-action { background: #1e3a5f; border: 2px solid #2563eb; }
+        .n-popup { background: #2e1065; border: 2px solid #7c3aed; }
+        .n-confirm { background: #4a1942; border: 2px solid #db2777; }
+        .n-result { background: #064e3b; border: 2px solid #059669; border-radius: 8px; }
+        .n-gnb { background: #172554; border: 2px solid #3b82f6; }
+        .n-state { padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+        .s-d { background: #374151; border: 2px solid #6b7280; color: #d1d5db; }
+        .s-p { background: #422006; border: 2px solid #d97706; color: #fbbf24; }
+        .s-pu { background: #064e3b; border: 2px solid #059669; color: #34d399; }
+        .s-r { background: #450a0a; border: 2px solid #dc2626; color: #f87171; }
+        .s-a { background: #064e3b; border: 2px solid #059669; color: #34d399; }
+        .s-de { background: #450a0a; border: 2px solid #dc2626; color: #f87171; }
+
+        /* Arrows */
+        .av { display: flex; flex-direction: column; align-items: center; }
+        .av-l { width: 2px; height: 14px; background: #475569; }
+        .av-h { color: #6366f1; font-size: 11px; }
+        .al { font-size: 9px; color: #64748b; background: #1e293b; padding: 1px 8px; border-radius: 3px; border: 1px solid #334155; margin: 2px 0; }
+
+        /* Layout */
+        .col { display: flex; flex-direction: column; align-items: center; }
+        .row { display: flex; align-items: flex-start; justify-content: center; gap: 0; }
+        .branch { display: flex; gap: 18px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+        .bi { display: flex; flex-direction: column; align-items: center; }
+        .tag { font-size: 9px; color: #94a3b8; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1px 8px; margin-bottom: 4px; }
+        .tag-admin { color: #fbbf24; border-color: #d97706; }
+
+        /* Collapsible tree node */
+        .tnode { display: flex; flex-direction: column; align-items: center; }
+        .kids { display: none; flex-direction: column; align-items: center; }
+        .tnode.open > .kids { display: flex; }
+        .tgl { cursor: pointer; position: relative; padding-right: 26px; transition: filter 0.15s, box-shadow 0.15s; }
+        .tgl:hover { filter: brightness(1.3); box-shadow: 0 0 0 2px rgba(129,140,248,0.35); }
+        .caret { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 9px; color: #818cf8; transition: transform 0.2s; pointer-events: none; }
+        .tnode:not(.open) .caret { transform: translateY(-50%) rotate(-90deg); }
+
+        .dash { border: 2px dashed #334155; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; align-items: center; }
+        .zone { border: 2px solid #334155; border-radius: 12px; padding: 18px; width: 100%; }
+        .zone-l { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-bottom: 14px; }
+        .sec { margin-top: 26px; }
+        .sec-l { font-size: 10px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-bottom: 12px; }
+        .ret { font-size: 9px; color: #475569; font-style: italic; margin: 2px 0; }
+
+        /* Legend */
+        .legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 26px; }
+        .lg { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #94a3b8; }
+        .lg .sw { width: 14px; height: 14px; border-radius: 4px; }
+
+        /* Role matrix */
+        table.mx { border-collapse: collapse; margin: 0 auto; font-size: 11px; }
+        table.mx th, table.mx td { border: 1px solid #334155; padding: 6px 12px; text-align: center; }
+        table.mx th { background: #1e293b; color: #cbd5e1; font-weight: 600; }
+        table.mx td.yes { color: #34d399; font-weight: 700; }
+        table.mx td.no { color: #f87171; font-weight: 700; }
+        table.mx td.part { color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="title">AI Skill Management — Sitemap (Tree)</div>
+        <div class="subtitle">Bản đồ màn hình &amp; luồng sử dụng · Tổng hợp từ SRS</div>
+        <div class="hint">💡 Click vào một node có ▼ để mở / đóng cây con bên dưới</div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="lg"><span class="sw" style="background:#0c4a6e;border:2px solid #0ea5e9;"></span>Root</div>
+            <div class="lg"><span class="sw" style="background:#064e3b;border:2px solid #059669;"></span>Start / Result</div>
+            <div class="lg"><span class="sw" style="background:#1e293b;border:2px solid #475569;"></span>Màn hình</div>
+            <div class="lg"><span class="sw" style="background:#172554;border:2px solid #3b82f6;"></span>GNB</div>
+            <div class="lg"><span class="sw" style="background:#1e3a5f;border:2px solid #2563eb;"></span>Hành động</div>
+            <div class="lg"><span class="sw" style="background:#2e1065;border:2px solid #7c3aed;"></span>Popup</div>
+            <div class="lg"><span class="sw" style="background:#4a1942;border:2px solid #db2777;"></span>Xác nhận</div>
+        </div>
+
+        <!-- ============ ROOT ============ -->
+        <div class="col" style="gap:0;">
+            <div class="nd n-root"><h5>AI SKILL MANAGEMENT (AISTEA)</h5><div class="s">Hệ thống quản lý &amp; đánh giá AI Skill</div></div>
+            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+
+            <!-- ===== ZONE 1: PRE-LOGIN ===== -->
+            <div class="zone">
+                <div class="zone-l">Khu vực trước đăng nhập</div>
+                <div class="col" style="gap:0;">
+                    <div class="tnode open">
+                        <div class="nd n-screen tgl" style="min-width:180px;"><h5>Login</h5><div class="s">/login · User ID + Password</div><span class="caret">▼</span></div>
+                        <div class="kids">
+                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                            <div class="branch" style="gap:14px;">
+                                <!-- Register -->
+                                <div class="tnode">
+                                    <div class="nd n-screen tgl"><h5>Register</h5><div class="s">/register</div><span class="caret">▼</span></div>
+                                    <div class="kids">
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-action"><h5>Nhập 6 trường</h5><div class="s">ID · Name · Knox · Email · Pass</div></div>
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-result"><h5>Thành công</h5><div class="s">NORMAL_USER · ACTIVE</div></div>
+                                        <div class="av"><div class="al">về</div><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-screen"><h5>Login</h5></div>
+                                    </div>
+                                </div>
+                                <!-- Forgot Password -->
+                                <div class="tnode">
+                                    <div class="nd n-screen tgl"><h5>Forgot Password</h5><div class="s">/forgot-password</div><span class="caret">▼</span></div>
+                                    <div class="kids">
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-action"><h5>Request OTP</h5><div class="s">Nhập User ID → email OTP</div></div>
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-action"><h5>Verify OTP</h5><div class="s">6 số · 5 phút · Resend</div></div>
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-action"><h5>Reset Password</h5><div class="s">New + Confirm</div></div>
+                                        <div class="av"><div class="al">thành công → ACTIVE</div><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="nd n-screen"><h5>Login</h5></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="av" style="margin-top:12px;"><div class="al">Login thành công</div><div class="av-l"></div><div class="av-h">▼</div></div>
+                            <div class="nd n-start"><h5>→ Home</h5><div class="s">vào khu vực sau đăng nhập</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="av" style="margin-top:16px;"><div class="av-l"></div><div class="av-h">▼</div></div>
+
+            <!-- ===== ZONE 2: POST-LOGIN ===== -->
+            <div class="zone" style="border-color:#3b82f6;">
+                <div class="zone-l" style="color:#93c5fd;">Khu vực sau đăng nhập (có GNB)</div>
+                <div class="col" style="gap:0;">
+
+                    <div class="tnode open">
+                        <div class="nd n-gnb tgl" style="min-width:240px;"><h5>GNB — Global Navigation</h5><div class="s">Header + Sidebar · mọi màn hình</div><span class="caret">▼</span></div>
+                        <div class="kids">
+                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+
+                            <!-- GNB splits into Sidebar + Header -->
+                            <div class="branch" style="gap:28px;">
+
+                                <!-- ============ SIDEBAR ============ -->
+                                <div class="tnode open">
+                                    <div class="nd n-gnb tgl" style="min-width:130px;"><h5>Sidebar</h5><div class="s">3 nhóm menu</div><span class="caret">▼</span></div>
+                                    <div class="kids">
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="branch" style="gap:16px;">
+
+                                            <!-- ===== Nhóm Home ===== -->
+                                            <div class="tnode">
+                                                <div class="nd n-screen tgl" style="min-width:150px;"><h5>Home</h5><div class="s">/home · landing</div><span class="caret">▼</span></div>
+                                                <div class="kids">
+                                                    <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                    <div class="branch" style="gap:8px;">
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Greeting</h5><div class="s">Name · Org · Role</div></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="tag tag-admin">ADMIN</div>
+                                                            <div class="nd n-action"><h5>Review Banner</h5><div class="s">skill chờ duyệt</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-screen"><h5>Skill Mgmt</h5><div class="s">filter PENDING_APPROVAL</div></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>KPI Cards (6)</h5><div class="s">click → pre-filter</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-screen"><h5>Skill Mgmt</h5></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>My Recent Skills</h5><div class="s">5 skill của mình</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-popup"><h5>Detail Popup</h5></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Recently Updated</h5><div class="s">5 skill khác</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-popup"><h5>Detail Popup</h5></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Quick Actions</h5><div class="s">Add Skill · Go to Mgmt</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-popup"><h5>Add Popup</h5></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- ===== Nhóm Skill Management ===== -->
+                                            <div class="tnode">
+                                                <div class="nd n-screen tgl" style="min-width:150px;"><h5>Skill Management</h5><div class="s">/skills</div><span class="caret">▼</span></div>
+                                                <div class="kids">
+                                                    <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                    <div class="branch" style="gap:8px;">
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Search / Filter</h5><div class="s">7 điều kiện</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-result"><h5>Result Grid</h5></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Toolbar</h5><div class="s">Add · Bulk Delete · Export</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="branch" style="gap:6px;">
+                                                                <div class="bi" style="gap:0;"><div class="nd n-popup"><h5>Add Popup</h5></div></div>
+                                                                <div class="bi" style="gap:0;"><div class="nd n-confirm"><h5>Confirm Delete</h5></div></div>
+                                                                <div class="bi" style="gap:0;"><div class="nd n-result"><h5>Export Excel</h5></div></div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Click Skill</h5><div class="s">name / dbl-click</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-popup"><h5>Detail Popup</h5></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-popup"><h5>Edit Popup</h5><div class="s">từ nút "Sửa"</div></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- ===== Nhóm User Management ===== -->
+                                            <div class="tnode">
+                                                <div class="tag tag-admin">CHỈ ADMIN</div>
+                                                <div class="nd n-screen tgl" style="min-width:150px;"><h5>User Management</h5><div class="s">/users</div><span class="caret">▼</span></div>
+                                                <div class="kids">
+                                                    <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                    <div class="branch" style="gap:8px;">
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Search</h5><div class="s">8 điều kiện</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-result"><h5>User Grid</h5></div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Toolbar</h5><div class="s">Create · Upload · Export</div></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="branch" style="gap:6px;">
+                                                                <div class="bi" style="gap:0;"><div class="nd n-popup"><h5>Create User</h5></div></div>
+                                                                <div class="bi" style="gap:0;"><div class="nd n-popup"><h5>Bulk Upload</h5></div></div>
+                                                                <div class="bi" style="gap:0;"><div class="nd n-result"><h5>Export</h5></div></div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Click Row</h5></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-popup"><h5>User Detail</h5><div class="s">xem / sửa / save</div></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ============ HEADER ============ -->
+                                <div class="tnode">
+                                    <div class="nd n-gnb tgl" style="min-width:130px;"><h5>Header</h5><div class="s">sticky top</div><span class="caret">▼</span></div>
+                                    <div class="kids">
+                                        <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                        <div class="branch" style="gap:12px;">
+                                            <!-- Brand -->
+                                            <div class="bi" style="gap:0;">
+                                                <div class="nd n-action"><h5>Brand</h5><div class="s">AI SKILL MANAGEMENT</div></div>
+                                                <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                <div class="nd n-screen"><h5>→ Home</h5></div>
+                                            </div>
+                                            <!-- Notification -->
+                                            <div class="tnode">
+                                                <div class="nd n-action tgl"><h5>🔔 Notification</h5><div class="s">badge unread</div><span class="caret">▼</span></div>
+                                                <div class="kids">
+                                                    <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                    <div class="nd n-popup"><h5>Notification Panel</h5><div class="s">10 mới nhất</div></div>
+                                                    <div class="av"><div class="al">click notification</div><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                    <div class="nd n-popup"><h5>Skill Detail</h5><div class="s">nếu có liên kết</div></div>
+                                                </div>
+                                            </div>
+                                            <!-- User Menu -->
+                                            <div class="tnode">
+                                                <div class="nd n-action tgl"><h5>(avatar) User Menu</h5><div class="s">thông tin user</div><span class="caret">▼</span></div>
+                                                <div class="kids">
+                                                    <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                    <div class="branch" style="gap:10px;">
+                                                        <!-- My Settings → Settings -->
+                                                        <div class="tnode">
+                                                            <div class="nd n-action tgl"><h5>My Settings</h5><span class="caret">▼</span></div>
+                                                            <div class="kids">
+                                                                <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                                <div class="nd n-screen"><h5>Settings</h5><div class="s">/settings</div></div>
+                                                                <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                                <div class="branch" style="gap:6px;">
+                                                                    <div class="bi" style="gap:0;"><div class="nd n-action"><h5>Profile</h5><div class="s">avatar · name</div></div></div>
+                                                                    <div class="bi" style="gap:0;"><div class="nd n-action"><h5>Preferences</h5><div class="s">ngôn ngữ · múi giờ</div></div></div>
+                                                                    <div class="bi" style="gap:0;"><div class="nd n-action"><h5>Notifications</h5><div class="s">in-app · email</div></div></div>
+                                                                    <div class="bi" style="gap:0;"><div class="nd n-action"><h5>Security</h5><div class="s">đổi mật khẩu</div></div></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <!-- Logout -->
+                                                        <div class="bi" style="gap:0;">
+                                                            <div class="nd n-action"><h5>Logout</h5></div>
+                                                            <div class="av"><div class="av-l"></div><div class="av-h">▼</div></div>
+                                                            <div class="nd n-start"><h5>→ Login</h5><div class="s">xóa session</div></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ SKILL STATE MACHINE ============ -->
+        <div class="sec">
+            <div class="sec-l">Skill State Machine</div>
+            <div class="dash">
+                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:center;">
+                    <div class="n-state s-d">DRAFT</div>
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Submit</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-p">PENDING_APPROVAL</div>
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Approve</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-pu">PUBLISHED</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:center; margin-top:10px;">
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Reject</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-r">REJECTED</div>
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Submit</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-p">PENDING_APPROVAL</div>
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Withdraw</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-d">DRAFT</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ USER STATE MACHINE ============ -->
+        <div class="sec">
+            <div class="sec-l">User Status</div>
+            <div class="dash">
+                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:center;">
+                    <div class="n-state s-a">ACTIVE</div>
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Admin deactivate</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-de">DEACTIVE</div>
+                    <div style="display:flex;flex-direction:column;align-items:center;"><div style="font-size:8px;color:#64748b;">Reset Password OK</div><div style="color:#6366f1;font-size:12px;">▶</div></div>
+                    <div class="n-state s-a">ACTIVE</div>
+                </div>
+                <div class="ret" style="margin-top:8px;">DEACTIVE không Login được · dùng được Forgot Password · chỉ Reset Password thành công mới kích hoạt</div>
+            </div>
+        </div>
+
+        <!-- ============ ROLE MATRIX ============ -->
+        <div class="sec">
+            <div class="sec-l">Ma trận truy cập theo Role</div>
+            <table class="mx">
+                <tr><th>Màn hình / Chức năng</th><th>NORMAL_USER</th><th>ADMIN_USER</th></tr>
+                <tr><td>Login / Register / Forgot Password</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><td>Home</td><td class="yes">✓</td><td class="part">✓ + Review banner</td></tr>
+                <tr><td>Skill Management</td><td class="part">✓ (mình + Published theo scope)</td><td class="yes">✓ (mọi skill)</td></tr>
+                <tr><td>Add / Edit / Delete Skill</td><td class="part">✓ (skill của mình)</td><td class="yes">✓ (mọi skill)</td></tr>
+                <tr><td>Approve / Reject Skill</td><td class="no">✕</td><td class="yes">✓</td></tr>
+                <tr><td>User Management</td><td class="no">✕ (403)</td><td class="yes">✓</td></tr>
+                <tr><td>Settings (cá nhân)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        document.querySelectorAll('.tgl').forEach(function (el) {
+            el.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var tnode = el.closest('.tnode');
+                if (tnode) { tnode.classList.toggle('open'); }
+            });
+        });
+    </script>
+</body>
+</html>

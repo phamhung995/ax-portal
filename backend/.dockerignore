@@ -1,0 +1,9 @@
+target/
+!target/*.jar
+.idea/
+*.iml
+*.iws
+*.ipr
+.git/
+.gitignore
+*.md

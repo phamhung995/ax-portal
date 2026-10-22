@@ -1,0 +1,187 @@
+/* Product-level styles (above the design system layers).
+ * Design system tokens/components are loaded in main.ts:
+ *   design-system/tokens.css  -> --ds-* custom properties
+ *   design-system/components.css -> .p-* component classes
+ */
+
+:root {
+  --nx-app-header-height: 56px;
+  --nx-app-sidebar-width: 240px;
+  --nx-app-sidebar-width-wide: 256px;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: var(--ds-color-canvas, #100d2b);
+  color: var(--ds-color-text-primary, #f4f8fc);
+  font-family: var(--ds-font-sans, 'Inter', system-ui, sans-serif);
+  font-size: 14px;
+  line-height: 1.43;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: var(--ds-color-accent, #67e8f9);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Screen reader only */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Native checkboxes (used in grids) */
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ds-color-accent);
+  cursor: pointer;
+}
+input[type='checkbox']:disabled {
+  cursor: not-allowed;
+}
+
+/* Table rows: the design system's .p-table has no row hover — apply the
+   standard list-item hover accent (same token as nav items / bell items). */
+@media (hover: hover) {
+  .p-table tbody tr:hover td {
+    background: var(--ds-list-item-hover-accent);
+  }
+}
+
+/* User menu trigger (avatar + name in the header): no button background —
+   the default .p-dropdown-trigger has a tinted button surface. Design system
+   files stay untouched. */
+.p-dropdown-trigger {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Shared rich-text rendering (Tiptap HTML from skill descriptions and
+   feedback content). Applied via v-html after sanitizeHtml(). */
+.rich-content {
+  color: var(--ds-color-text-primary);
+  line-height: 1.6;
+  word-break: break-word;
+}
+.rich-content p {
+  margin: 0 0 var(--ds-space-2);
+}
+.rich-content p:last-child {
+  margin-bottom: 0;
+}
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5,
+.rich-content h6 {
+  margin: var(--ds-space-3) 0 var(--ds-space-2);
+  color: var(--ds-color-text-primary);
+}
+.rich-content h1 { font-size: 20px; }
+.rich-content h2 { font-size: 16px; }
+.rich-content h3 { font-size: 14px; }
+.rich-content ul,
+.rich-content ol {
+  margin: 0 0 var(--ds-space-2);
+  padding-left: 22px;
+}
+.rich-content ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 4px;
+}
+.rich-content li[data-type='taskItem'] {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.rich-content li[data-type='taskItem'] input[type='checkbox'] {
+  accent-color: var(--ds-color-accent);
+}
+.rich-content li[data-type='taskItem'][data-checked='true'] > div {
+  text-decoration: line-through;
+  color: var(--ds-color-text-muted, var(--ds-color-text-secondary));
+}
+.rich-content blockquote {
+  margin: 0 0 var(--ds-space-2);
+  padding-left: var(--ds-space-3);
+  border-left: 3px solid var(--ds-color-border-strong);
+  color: var(--ds-color-text-secondary);
+}
+.rich-content pre {
+  margin: 0 0 var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-input-background);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-sm);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  overflow-x: auto;
+}
+.rich-content code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  background: var(--ds-input-background);
+  border: 1px solid var(--ds-color-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.rich-content pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.rich-content a {
+  color: var(--ds-color-accent);
+  text-decoration: underline;
+}
+.rich-content mark {
+  background: rgba(250, 204, 21, 0.35);
+  color: inherit;
+  border-radius: 2px;
+}
+.rich-content hr {
+  border: none;
+  border-top: 1px solid var(--ds-color-border);
+  margin: var(--ds-space-3) 0;
+}
+.rich-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--ds-radius-sm);
+}
+.rich-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 var(--ds-space-2);
+}
+.rich-content th,
+.rich-content td {
+  border: 1px solid var(--ds-color-border);
+  padding: 4px 8px;
+  vertical-align: top;
+  text-align: left;
+}
+.rich-content th {
+  background: var(--ds-color-bg-secondary, rgba(255, 255, 255, 0.04));
+  font-weight: 600;
+}

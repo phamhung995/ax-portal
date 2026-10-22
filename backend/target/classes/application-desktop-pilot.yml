@@ -1,0 +1,29 @@
+# Explicit local-only profile. Use desktop-pilot/start.ps1 to verify DB identity first.
+spring:
+  datasource:
+    url: ${DESKTOP_PILOT_JDBC_URL}
+    username: ${DESKTOP_PILOT_DB_USERNAME}
+    password: ${DESKTOP_PILOT_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    baseline-on-migrate: false
+    validate-on-migrate: true
+server:
+  address: 127.0.0.1
+  port: 8080
+jwt:
+  secret-key: ${DESKTOP_PILOT_JWT_SECRET}
+knox:
+  mail:
+    system-id: ''
+    access-token: ''
+app:
+  upload:
+    dir: ${DESKTOP_PILOT_STORAGE}/avatars/
+    skill-dir: ${DESKTOP_PILOT_STORAGE}/upstream-skills/
+desktop:
+  pilot:
+    marker: ${DESKTOP_PILOT_MARKER}
+    package-root: ${DESKTOP_PILOT_STORAGE}/desktop-packages/

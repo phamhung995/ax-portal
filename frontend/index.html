@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Second defense layer against stored XSS in AI News email bodies
+         (rendered via v-html) — AI_News_Screen_SRS.md NFR-02. Blocks any
+         <script> injected into email HTML; the primary layer is the
+         server-side Jsoup sanitizer at import time. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'"
+    >
+    <title>AX Portal</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

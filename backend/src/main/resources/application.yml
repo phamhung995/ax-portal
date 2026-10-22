@@ -1,0 +1,128 @@
+spring:
+  application:
+    name: skill-management
+
+  # ====================== Database Configuration ======================
+  # Real credentials live in application-local.yml (gitignored) or env vars
+  # DB_HOST / DB_PORT / DB_NAME / DB_USERNAME / DB_PASSWORD.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:107.120.93.231}:${DB_PORT:5432}/${DB_NAME:skill_manager}}
+    username: ${DB_USERNAME:svcepc}
+    password: ${DB_PASSWORD:Sep@2026}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Flyway manages schema; Hibernate only validates
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # ====================== Flyway Migration ======================
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: false
+    locations: classpath:db/migration
+
+  # ====================== Virtual Threads (Java 21) ======================
+  threads:
+    virtual:
+      enabled: true
+
+  # ====================== Multipart Upload ======================
+  # Tomcat enforces the per-FORM-FIELD size limit via max-file-size (there is
+  # NO separate max-field-size property in Spring Boot). The description field
+  # can embed base64 data-URI images (a 5MB image becomes ~6.7MB of text), so
+  # max-file-size must be large enough for BOTH the description field and the
+  # uploaded skill file (app logic caps skill files at 10MB). max-request-size
+  # covers the whole request (description + file(s) sent in one multipart call).
+  # NOTE: use literal values here — ${ENV:default} placeholders break
+  # @ConfigurationProperties binding (MultipartProperties "left unbound").
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 40MB
+
+# ====================== JWT Configuration ======================
+jwt:
+  secret-key: ${JWT_SECRET:ZGV2LW9ubHktc2VjcmV0LWtleS1tdXN0LWNoYW5nZS1pbi1wcm9kdWN0aW9u}
+  expiration: ${JWT_EXPIRATION:1800000}                 # 30 minutes in milliseconds
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours in milliseconds
+  cleanup:
+    cron: ${JWT_CLEANUP_CRON:0 0 2 * * ?}               # 2:00 AM daily
+
+
+# ====================== Knox C&C Suite Mail API Configuration ======================
+# Knox Mail API v2.0 (Knox Developers Center). When KNOX_MAIL_SYSTEM_ID is set,
+# KnoxMailServiceImpl is used; otherwise LogEmailServiceImpl (dev mode: OTP is
+# written to backend/otp-dev.log) is used.
+# Credentials (Account ID + access token) are issued via the Knox interface
+# linkage application (stage first, then production).
+#
+# Sender per environment:
+#   Dev  (localhost / skmd.svcepc.gdcv.vn):  knox_id tq.dat1, stage API
+#   Prod (skm.svcepc.gdcv.vn):              knox_id gdcv.cag.ax, production API
+# The dev values are the defaults below; the production server overrides them
+# via env vars (.env on the server): KNOX_MAIL_BASE_URL=https://openapi.samsung.net,
+# KNOX_MAIL_SYSTEM_ID, KNOX_MAIL_ACCESS_TOKEN,
+# KNOX_MAIL_SENDER_EMAIL=gdcv.cag.ax@samsung.com, KNOX_MAIL_SENDER_KNOX_ID=gdcv.cag.ax
+knox:
+  mail:
+    base-url: ${KNOX_MAIL_BASE_URL:https://openapi.stage.samsung.net}
+    system-id: ${KNOX_MAIL_SYSTEM_ID:KCC6VREST00066}
+    access-token: ${KNOX_MAIL_ACCESS_TOKEN:108ddfc6-fde0-3164-88e5-657d6f7dffcb}
+    sender-email: ${KNOX_MAIL_SENDER_EMAIL:tq.dat1@stage.samsung.com}
+    sender-knox-id: ${KNOX_MAIL_SENDER_KNOX_ID:tq.dat1}
+    connect-timeout-seconds: ${KNOX_MAIL_CONNECT_TIMEOUT:10}
+    read-timeout-seconds: ${KNOX_MAIL_READ_TIMEOUT:30}
+
+# ====================== AI News Batch Job (AI-NEWS-IMPORT) ======================
+# Cron: 00:00 and 12:00 daily (AI_News_Batch.md §4.1).
+# Mailbox passwords are NOT in the DB (BR-NEWS-011): ai-news.mailbox-secrets maps
+# ai_news_source.secret_ref → password, supplied via env vars on the server.
+ai-news:
+  cron: ${AI_NEWS_CRON:0 0 0,12 * * ?}
+  fetch-limit: ${AI_NEWS_FETCH_LIMIT:50}
+  import-window-days: ${AI_NEWS_IMPORT_WINDOW_DAYS:2}
+  archive-days: ${AI_NEWS_ARCHIVE_DAYS:90}
+  # Fallback IMAP host for sources still seeded with the 'imap.internal'
+  # placeholder (V27). Set the real Samsung mail IMAP host via env var.
+  default-imap-host: ${AI_NEWS_DEFAULT_IMAP_HOST:}
+  mailbox-secrets:
+    sds-ai-news: ${AI_NEWS_SECRET_SDS:}
+    gdc-tech-support: ${AI_NEWS_SECRET_GDC:}
+    part-x-ai: ${AI_NEWS_SECRET_PART_X:}
+    part-y-ai: ${AI_NEWS_SECRET_PART_Y:}
+    group1-ai: ${AI_NEWS_SECRET_GROUP1:}
+    group2-ai: ${AI_NEWS_SECRET_GROUP2:}
+
+# ====================== CORS Configuration ======================
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+
+# ====================== Actuator ======================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# ====================== File Upload Configuration ======================
+app:
+  upload:
+    dir: ${UPLOAD_DIR:uploads/avatars/}
+    skill-dir: ${SKILL_UPLOAD_DIR:uploads/skills/}
+    skill-request-dir: ${SKILL_REQUEST_UPLOAD_DIR:uploads/skill-requests/}
+    # Public URL prefix for avatar files (must match the WebMvc resource handler).
+    avatar-url-prefix: ${UPLOAD_AVATAR_URL_PREFIX:/uploads/avatars}
+    skill-request-url-prefix: ${UPLOAD_SKILL_REQUEST_URL_PREFIX:/uploads/skill-requests}
+  skill:
+    # Minutes between two counted views of the same skill by the same user.
+    view-window-minutes: ${SKILL_VIEW_WINDOW_MINUTES:15}
+
+server:
+  port: 8080
+  servlet:
+    context-path: /skm
