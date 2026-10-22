@@ -123,6 +123,6 @@ app:
     view-window-minutes: ${SKILL_VIEW_WINDOW_MINUTES:15}
 
 server:
-  port: 8080
+  port: 8081
   servlet:
     context-path: /skm

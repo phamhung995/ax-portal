@@ -1,7 +1,7 @@
 -- Flyway migration V33: process stage short description
 -- Shown under the stage name in the Process Map pipeline.
 
-ALTER TABLE process_stage ADD COLUMN description VARCHAR(200);
+ALTER TABLE process_stage ADD COLUMN IF NOT EXISTS description VARCHAR(200);
 
 -- Descriptions for the default stages seeded in V31.
 UPDATE process_stage SET description = 'Gathering and clarifying business requirements' WHERE name = 'Requirements';
