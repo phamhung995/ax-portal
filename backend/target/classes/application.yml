@@ -1,0 +1,176 @@
+spring:
+  application:
+    name: skill-management
+
+  # ====================== Database Configuration ======================
+  # Real credentials live in application-local.yml (gitignored) or env vars
+  # DB_HOST / DB_PORT / DB_NAME / DB_USERNAME / DB_PASSWORD.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:skill_manager}}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin}
+    hikari:
+      # Pinned explicitly (Spring Boot's default is 10, but the default can
+      # change across versions — the app's connection budget is sized for
+      # this value: batch job + UI + schedulers).
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Flyway manages schema; Hibernate only validates
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # ====================== Flyway Migration ======================
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: false
+    locations: classpath:db/migration
+
+  # ====================== Virtual Threads (Java 21) ======================
+  threads:
+    virtual:
+      enabled: true
+
+  # ====================== Multipart Upload ======================
+  # Tomcat enforces the per-FORM-FIELD size limit via max-file-size (there is
+  # NO separate max-field-size property in Spring Boot). The description field
+  # can embed base64 data-URI images (a 5MB image becomes ~6.7MB of text), so
+  # max-file-size must be large enough for BOTH the description field and the
+  # largest single uploaded file (app logic caps AI tool files at 50MB,
+  # skill files at 10MB). max-request-size covers the whole request
+  # (description + file(s) sent in one multipart call). Skill requests allow
+  # up to 10 files x 10MB = 100MB, so max-request-size must be >= 100MB
+  # (nginx client_max_body_size is 100m to match).
+  # NOTE: use literal values here — ${ENV:default} placeholders break
+  # @ConfigurationProperties binding (MultipartProperties "left unbound").
+  servlet:
+    multipart:
+      max-file-size: 55MB
+      max-request-size: 110MB
+
+# ====================== JWT Configuration ======================
+jwt:
+  secret-key: ${JWT_SECRET:ZGV2LW9ubHktc2VjcmV0LWtleS1tdXN0LWNoYW5nZS1pbi1wcm9kdWN0aW9u}
+  expiration: ${JWT_EXPIRATION:1800000}                 # 30 minutes in milliseconds
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours in milliseconds
+  cleanup:
+    cron: ${JWT_CLEANUP_CRON:0 0 2 * * ?}               # 2:00 AM daily
+
+
+# ====================== Knox C&C Suite Mail API Configuration ======================
+# Knox Mail API v2.0 (Knox Developers Center). When KNOX_MAIL_SYSTEM_ID is set,
+# KnoxMailServiceImpl is used; otherwise LogEmailServiceImpl (dev mode: OTP is
+# written to backend/otp-dev.log) is used.
+# Credentials (Account ID + access token) are issued via the Knox interface
+# linkage application (stage first, then production).
+#
+# Sender per environment:
+#   Dev  (localhost / skmd.svcepc.gdcv.vn):  knox_id tq.dat1, stage API
+#   Prod (skm.svcepc.gdcv.vn):              knox_id gdcv.cag.ax, production API
+# The dev values are the defaults below; the production server overrides them
+# via env vars (.env on the server): KNOX_MAIL_BASE_URL=https://openapi.samsung.net,
+# KNOX_MAIL_SYSTEM_ID, KNOX_MAIL_ACCESS_TOKEN,
+# KNOX_MAIL_SENDER_EMAIL=gdcv.cag.ax@samsung.com, KNOX_MAIL_SENDER_KNOX_ID=gdcv.cag.ax
+knox:
+  mail:
+    base-url: ${KNOX_MAIL_BASE_URL:https://openapi.stage.samsung.net}
+    system-id: ${KNOX_MAIL_SYSTEM_ID:KCC6VREST00066}
+    access-token: ${KNOX_MAIL_ACCESS_TOKEN:108ddfc6-fde0-3164-88e5-657d6f7dffcb}
+    sender-email: ${KNOX_MAIL_SENDER_EMAIL:tq.dat1@stage.samsung.com}
+    sender-knox-id: ${KNOX_MAIL_SENDER_KNOX_ID:tq.dat1}
+    connect-timeout-seconds: ${KNOX_MAIL_CONNECT_TIMEOUT:10}
+    read-timeout-seconds: ${KNOX_MAIL_READ_TIMEOUT:30}
+
+# ====================== AI News Batch Job (AI-NEWS-IMPORT) ======================
+# Cron: 00:00 and 12:00 daily (AI_News_Batch.md §4.1).
+# Mailbox passwords are NOT in the DB (BR-NEWS-011): ai-news.mailbox-secrets maps
+# ai_news_source.secret_ref → Knox portal password, supplied via env vars on the
+# server. The batch reads mailboxes through the Knox portal web mail API
+# (ai-news.knox.* — login with user/password, then mail REST API).
+ai-news:
+  # Master switch for the scheduled batch. Default false (batch paused —
+  # re-enable by setting true here or AI_NEWS_ENABLED=true on the server).
+  # Local/dev: keep false so a locally running backend never fires the cron
+  # and writes to the DB.
+  enabled: ${AI_NEWS_ENABLED:false}
+  cron: ${AI_NEWS_CRON:0 0 0,12 * * ?}
+  fetch-limit: ${AI_NEWS_FETCH_LIMIT:50}
+  import-window-days: ${AI_NEWS_IMPORT_WINDOW_DAYS:2}
+  archive-days: ${AI_NEWS_ARCHIVE_DAYS:90}
+  # Knox C&C Suite portal (web mail) — the batch job's read source
+  # (AI_News_Batch.md §3.1). The reader logs into the portal sign-in API with
+  # the mailbox user/password (mailbox-secrets below) and reads the inbox via
+  # the mail REST API. Paths/field names default to the values probed from the
+  # portal SPA bundles; override via env only if the contract changes.
+  knox:
+    base-url: ${AI_NEWS_KNOX_BASE_URL:http://kor5.samsung.net}
+    login-base-url: ${AI_NEWS_KNOX_LOGIN_BASE_URL:https://www.samsung.net}
+    # Zone for zone-less mail dates (the portal is a Korea service — its
+    # timestamps are KST; the prod JVM runs UTC). Override only if the
+    # portal contract changes.
+    date-zone: ${AI_NEWS_KNOX_DATE_ZONE:Asia/Seoul}
+  # Ops recipient for the BR-NEWS-012 alert (FAILED/PARTIAL 3 consecutive
+  # runs). Empty = log-only alert. Supplied via env var, never committed.
+  alert-email: ${AI_NEWS_ALERT_EMAIL:}
+  mailbox-secrets:
+    sds-ai-news: ${AI_NEWS_SECRET_SDS:}
+    gdc-tech-support: ${AI_NEWS_SECRET_GDC:}
+    part-x-ai: ${AI_NEWS_SECRET_PART_X:}
+    part-y-ai: ${AI_NEWS_SECRET_PART_Y:}
+    group1-ai: ${AI_NEWS_SECRET_GROUP1:}
+    group2-ai: ${AI_NEWS_SECRET_GROUP2:}
+
+# ====================== CORS Configuration ======================
+cors:
+  # Loopback origins for local dev. Uses a port wildcard (*) because the Vite
+  # dev server auto-increments its port (5173 -> 5174 -> 5175 ...) whenever the
+  # previous one is busy, so hardcoding a single port breaks login (CORS
+  # preflight returns 403, surfaced to the user as FORBIDDEN). The wildcard
+  # covers any port on the three loopback hosts the browser may resolve
+  # 'localhost' to (RFC 6724 prefers ::1 over 127.0.0.1).
+  allowed-origins: ${CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*,http://[::1]:*}
+
+# ====================== Actuator ======================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# ====================== File Upload Configuration ======================
+app:
+  # Public base URL of the frontend app (used in notification emails).
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  upload:
+    dir: ${UPLOAD_DIR:uploads/avatars/}
+    skill-dir: ${SKILL_UPLOAD_DIR:uploads/skills/}
+    ai-news-image-dir: ${AI_NEWS_IMAGE_DIR:uploads/ai-news-images/}
+    skill-request-dir: ${SKILL_REQUEST_UPLOAD_DIR:uploads/skill-requests/}
+    ai-tool-dir: ${AI_TOOL_UPLOAD_DIR:uploads/ai-tools/}
+    system-dir: ${SYSTEM_UPLOAD_DIR:uploads/systems/}
+    hr-dir: ${HR_UPLOAD_DIR:uploads/hr/}
+    org-dir: ${ORG_UPLOAD_DIR:uploads/org/}
+    # Public URL prefix for avatar files (must match the WebMvc resource handler).
+    avatar-url-prefix: ${UPLOAD_AVATAR_URL_PREFIX:/uploads/avatars}
+    # Public URL prefix for AI News inline images (must match the WebMvc handler).
+    ai-news-image-url-prefix: ${AI_NEWS_IMAGE_URL_PREFIX:/uploads/ai-news-images}
+    skill-request-url-prefix: ${UPLOAD_SKILL_REQUEST_URL_PREFIX:/uploads/skill-requests}
+  skill:
+    # Minutes between two counted views of the same skill by the same user.
+    view-window-minutes: ${SKILL_VIEW_WINDOW_MINUTES:15}
+  update:
+    # Storage dir for app release .nsis.zip files (AIPRO STUDIO silent auto-update).
+    storage-dir: ${APP_UPDATE_STORAGE_DIR:uploads/app-releases}
+    # Public base URL for download links in the updater manifest.
+    public-base-url: http://axd-portal.gafc.vn/api/v1/update
+
+server:
+  port: 8080
+  servlet:
+    context-path: ${APP_CONTEXT_PATH:/}
