@@ -9,7 +9,10 @@ import PasswordPolicy from '@/features/auth/components/PasswordPolicy.vue'
 import { authApi } from '@/features/auth/api'
 import { toUserError } from '@/lib/api'
 import { toastSuccess } from '@/lib/toast'
+import { useI18nStore } from '@/stores/i18n'
 
+const i18n = useI18nStore()
+const { t } = i18n
 const step = ref<'form' | 'otp'>('form')
 const name = ref('')
 const email = ref('')
@@ -33,11 +36,28 @@ const strength = computed(() => {
   return score
 })
 
+// Must match the rules displayed by <PasswordPolicy> — all must pass
+// before the OTP step (the backend only re-checks at register time).
+const passwordMeetsPolicy = computed(() => {
+  const p = password.value
+  return (
+    p.length >= 8 &&
+    /[A-Z]/.test(p) &&
+    /[a-z]/.test(p) &&
+    /[0-9]/.test(p) &&
+    /[^A-Za-z0-9]/.test(p)
+  )
+})
+
 async function onSendOtp() {
   error.value = ''
-  if (!name.value.trim()) return (error.value = 'Full name is required.')
-  if (!email.value) return (error.value = 'Email is required.')
-  if (password.value !== confirmPassword.value) return (error.value = 'Passwords do not match.')
+  if (!name.value.trim()) return (error.value = t('app.auth.fullNameRequired'))
+  if (!email.value) return (error.value = t('app.auth.emailRequired'))
+  if (!password.value) return (error.value = t('app.auth.passwordRequired'))
+  if (!passwordMeetsPolicy.value) {
+    return (error.value = t('app.auth.passwordPolicy'))
+  }
+  if (password.value !== confirmPassword.value) return (error.value = t('app.auth.passwordNotMatch'))
   loading.value = true
   try {
     await authApi.requestRegisterOtp(email.value)
@@ -66,7 +86,7 @@ async function onVerify() {
       password: password.value,
       confirmPassword: confirmPassword.value,
     })
-    toastSuccess('Registration successful. Please sign in.')
+    toastSuccess(t('app.auth.registerSuccess'))
     window.location.assign(`${import.meta.env.BASE_URL}login`)
   } catch (err) {
     const apiError = toUserError(err)
@@ -102,30 +122,30 @@ async function onResend() {
   <div class="auth-page">
     <PrismAmbientBackground />
     <form v-if="step === 'form'" class="auth-card p-glass" @submit.prevent="onSendOtp">
-      <h1 class="auth-title">Create Account</h1>
-      <p class="auth-subtitle">Register to access AI Skill Management</p>
+      <h1 class="auth-title">{{ t('app.auth.registerTitle') }}</h1>
+      <p class="auth-subtitle">{{ t('app.auth.registerSubtitle') }}</p>
 
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
 
       <PrismInput
         v-model="name"
-        label="User Name"
-        placeholder="Your full name"
+        :label="t('app.auth.userName')"
+        :placeholder="t('app.auth.userNamePh')"
         maxlength="100"
         required
       />
       <PrismInput
         v-model="email"
-        label="Email"
+        :label="t('app.common.email')"
         type="email"
-        placeholder="you@company.com"
+        :placeholder="t('app.common.emailPh')"
         autocomplete="email"
         required
       />
       <PrismPasswordInput
         v-model="password"
-        label="Password"
-        placeholder="At least 8 characters"
+        :label="t('app.auth.password')"
+        :placeholder="t('app.auth.min8Ph')"
         :strength="strength"
         autocomplete="new-password"
         required
@@ -133,23 +153,23 @@ async function onResend() {
       <PasswordPolicy :password="password" />
       <PrismPasswordInput
         v-model="confirmPassword"
-        label="Confirm Password"
-        placeholder="Repeat your password"
+        :label="t('app.auth.confirmPassword')"
+        :placeholder="t('app.auth.confirmPasswordPh')"
         autocomplete="new-password"
         required
       />
 
-      <PrismButton type="submit" :loading="loading">Send OTP</PrismButton>
+      <PrismButton type="submit" :loading="loading">{{ t('app.auth.sendOtp') }}</PrismButton>
 
       <p class="auth-register">
-        Already have an account? <RouterLink to="/login">Log In</RouterLink>
+        {{ t('app.auth.hasAccount') }} <RouterLink to="/login">{{ t('app.auth.loginBtn') }}</RouterLink>
       </p>
     </form>
 
     <form v-else class="auth-card p-glass" @submit.prevent="onVerify">
-      <h1 class="auth-title">Verify Your Email</h1>
+      <h1 class="auth-title">{{ t('app.auth.verifyTitle') }}</h1>
       <p class="auth-subtitle">
-        Enter the 6-digit verification code sent to <strong>{{ email }}</strong>
+        {{ t('app.auth.verifyDesc', { email }) }}
       </p>
 
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
@@ -165,7 +185,7 @@ async function onResend() {
       />
 
       <p class="auth-register">
-        <button type="button" class="linklike" @click="step = 'form'">Back</button>
+        <button type="button" class="linklike" @click="step = 'form'">{{ t('app.auth.back') }}</button>
       </p>
     </form>
   </div>

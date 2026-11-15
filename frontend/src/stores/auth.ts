@@ -139,6 +139,9 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(REFRESH_KEY)
     localStorage.removeItem(USER_KEY)
+    // Reset the "intro seen" flag so the next login shows the Introduction
+    // page again (all environments — see landingPath in router/index.ts).
+    sessionStorage.removeItem('ax-intro-seen')
   }
 
   return { token, refreshToken, user, isAuthenticated, isAdmin, setSession, setAvatarUrl, setUserName, clearSession }

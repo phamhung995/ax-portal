@@ -8,7 +8,10 @@ import PasswordPolicy from '@/features/auth/components/PasswordPolicy.vue'
 import { authApi } from '@/features/auth/api'
 import { toUserError } from '@/lib/api'
 import { toastSuccess } from '@/lib/toast'
+import { useI18nStore } from '@/stores/i18n'
 
+const i18n = useI18nStore()
+const { t } = i18n
 const route = useRoute()
 const router = useRouter()
 
@@ -32,11 +35,11 @@ const strength = computed(() => {
 async function onSubmit() {
   error.value = ''
   if (!email.value) {
-    error.value = 'Missing email. Please restart the reset flow.'
+    error.value = t('app.auth.resetMissingEmail')
     return
   }
   if (newPassword.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match.'
+    error.value = t('app.auth.passwordNotMatch')
     return
   }
   loading.value = true
@@ -46,7 +49,7 @@ async function onSubmit() {
       newPassword: newPassword.value,
       confirmPassword: confirmPassword.value,
     })
-    toastSuccess('Password has been reset. Please sign in.')
+    toastSuccess(t('app.auth.resetSuccess'))
     router.push('/login')
   } catch (err) {
     error.value = toUserError(err).message
@@ -60,15 +63,15 @@ async function onSubmit() {
   <div class="auth-page">
     <PrismAmbientBackground />
     <form class="auth-card p-glass" @submit.prevent="onSubmit">
-      <h1 class="auth-title">Choose a new password</h1>
-      <p v-if="email" class="auth-subtitle">For {{ email }}</p>
+      <h1 class="auth-title">{{ t('app.auth.resetTitle') }}</h1>
+      <p v-if="email" class="auth-subtitle">{{ t('app.auth.resetSubtitle', { email }) }}</p>
 
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
 
       <PrismPasswordInput
         v-model="newPassword"
-        label="New password"
-        placeholder="At least 8 characters"
+        :label="t('app.auth.newPassword')"
+        :placeholder="t('app.auth.min8Ph')"
         :strength="strength"
         autocomplete="new-password"
         required
@@ -76,16 +79,16 @@ async function onSubmit() {
       <PasswordPolicy :password="newPassword" />
       <PrismPasswordInput
         v-model="confirmPassword"
-        label="Confirm new password"
-        placeholder="Repeat your new password"
+        :label="t('app.auth.confirmNewPassword')"
+        :placeholder="t('app.auth.confirmNewPasswordPh')"
         autocomplete="new-password"
         required
       />
 
-      <PrismButton type="submit" :loading="loading">Reset password</PrismButton>
+      <PrismButton type="submit" :loading="loading">{{ t('app.auth.resetBtn') }}</PrismButton>
 
       <p class="auth-register">
-        <RouterLink to="/login">Back to sign in</RouterLink>
+        <RouterLink to="/login">{{ t('app.auth.backToSignIn') }}</RouterLink>
       </p>
     </form>
   </div>

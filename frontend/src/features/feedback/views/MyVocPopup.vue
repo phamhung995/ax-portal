@@ -10,10 +10,12 @@ import { feedbackApi } from '@/features/feedback/api'
 import { toUserError } from '@/lib/api'
 import { toastError } from '@/lib/toast'
 import { stripHtml } from '@/lib/sanitize'
+import { useI18nStore } from '@/stores/i18n'
 import type { FeedbackItem } from '@/features/feedback/types'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits(['update:open'])
+const { t, formatDateTime } = useI18nStore()
 
 type Tab = 'add' | 'list'
 const activeTab = ref<Tab>('add')
@@ -24,22 +26,13 @@ const loading = ref(false)
 const listError = ref('')
 
 const typeLabel = (code: string) =>
-  code === 'BUG' ? '🐞 Bug' : code === 'SUGGESTION' ? '💡 Suggestion' : code === 'QUESTION' ? '❓ Question' : code
+  code === 'BUG' ? '🐞 ' + t('app.feedback.typeBug') : code === 'SUGGESTION' ? '💡 ' + t('app.feedback.typeSuggestion') : code === 'QUESTION' ? '❓ ' + t('app.feedback.typeQuestion') : code
 const typeTone = (code: string) =>
   code === 'BUG' ? 'danger' : code === 'SUGGESTION' ? 'info' : 'neutral'
 const statusLabel = (code: string) =>
-  code === 'NEW' ? 'New' : code === 'IN_REVIEW' ? 'In Review' : code === 'RESOLVED' ? 'Resolved' : code === 'IGNORED' ? 'Ignored' : code
+  code === 'NEW' ? t('app.feedback.statusNew') : code === 'IN_REVIEW' ? t('app.feedback.statusInReview') : code === 'RESOLVED' ? t('app.feedback.statusResolved') : code === 'IGNORED' ? t('app.feedback.statusIgnored') : code
 const statusTone = (code: string) =>
   code === 'NEW' ? 'warning' : code === 'IN_REVIEW' ? 'info' : code === 'RESOLVED' ? 'success' : 'neutral'
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`
-}
 
 async function loadList() {
   loading.value = true
@@ -89,7 +82,7 @@ function openDetail(item: FeedbackItem) {
 <template>
   <PrismDialog
     :model-value="open"
-    title="VOC"
+    :title="t('app.feedback.vocTitle')"
     size="md"
     @update:model-value="(v) => !v && close()"
     @close="close"
@@ -103,7 +96,7 @@ function openDetail(item: FeedbackItem) {
         :aria-selected="activeTab === 'add'"
         @click="switchTab('add')"
       >
-        Add VOC
+        {{ t('app.feedback.addVoc') }}
       </button>
       <button
         type="button"
@@ -113,18 +106,18 @@ function openDetail(item: FeedbackItem) {
         :aria-selected="activeTab === 'list'"
         @click="switchTab('list')"
       >
-        My VOCs
+        {{ t('app.feedback.myVocs') }}
       </button>
     </div>
 
     <FeedbackForm v-if="activeTab === 'add'" @submitted="switchTab('list')" />
 
     <div v-else class="voc-list">
-      <div v-if="loading" class="voc-list-state">Loading…</div>
+      <div v-if="loading" class="voc-list-state">{{ t('app.feedback.loading') }}</div>
       <PrismEmptyState
         v-else-if="!items.length"
-        title="No VOCs yet"
-        description="VOCs you submit will appear here."
+        :title="t('app.feedback.noVocs')"
+        :description="t('app.feedback.noVocsDesc')"
       />
       <p v-else-if="listError" class="voc-list-error">{{ listError }}</p>
       <ul v-else class="voc-items">
@@ -142,7 +135,7 @@ function openDetail(item: FeedbackItem) {
     </div>
 
     <template #footer>
-      <PrismButton variant="secondary" @click="close">Close</PrismButton>
+      <PrismButton variant="secondary" @click="close">{{ t('app.common.close') }}</PrismButton>
     </template>
   </PrismDialog>
 

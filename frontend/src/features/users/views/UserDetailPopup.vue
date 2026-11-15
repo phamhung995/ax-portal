@@ -7,8 +7,10 @@ import PrismCombobox from '@/design-system/components/PrismCombobox.vue'
 import PrismEmptyState from '@/design-system/components/PrismEmptyState.vue'
 import { adminUserApi } from '@/features/users/api'
 import { toUserError } from '@/lib/api'
+import { orgRowLabel } from '@/lib/types'
 import { toastSuccess } from '@/lib/toast'
 import { useAuthStore } from '@/stores/auth'
+import { useI18nStore } from '@/stores/i18n'
 import { useUserListStore } from '@/features/users/store'
 import type { UserDetailResponse } from '@/features/users/types'
 
@@ -16,6 +18,7 @@ const props = defineProps<{ open: boolean; userId: number | null }>()
 const emit = defineEmits(['update:open', 'saved'])
 
 const auth = useAuthStore()
+const { t } = useI18nStore()
 const list = useUserListStore()
 
 const loading = ref(false)
@@ -30,14 +33,14 @@ const saving = ref(false)
 const saveError = ref('')
 const confirmCancel = ref(false)
 
-const ROLE_OPTIONS = [
-  { label: 'Normal User', value: 'NORMAL_USER' },
-  { label: 'Admin User', value: 'ADMIN_USER' },
-]
-const STATUS_OPTIONS = [
-  { label: 'Active', value: 'ACTIVE' },
-  { label: 'Deactive', value: 'DEACTIVE' },
-]
+const ROLE_OPTIONS = computed(() => [
+  { label: t('app.common.normalUser'), value: 'NORMAL_USER' },
+  { label: t('app.common.adminUser'), value: 'ADMIN_USER' },
+])
+const STATUS_OPTIONS = computed(() => [
+  { label: t('app.common.active'), value: 'ACTIVE' },
+  { label: t('app.common.deactive'), value: 'DEACTIVE' },
+])
 
 const isSelf = computed(() => detail.value != null && auth.user?.userId === detail.value.userId)
 
@@ -79,7 +82,7 @@ async function onSave() {
   if (!detail.value) return
   saveError.value = ''
   if (!userName.value.trim()) {
-    saveError.value = 'User name cannot be empty.'
+    saveError.value = t('app.users.nameRequired')
     return
   }
   saving.value = true
@@ -91,14 +94,13 @@ async function onSave() {
       expectedVersion: detail.value.version,
     })
     list.markDirty()
-    toastSuccess('User information has been updated successfully.')
+    toastSuccess(t('app.users.updatedToast'))
     emit('saved')
     emit('update:open', false)
   } catch (err) {
     const apiError = toUserError(err)
     if (apiError.code === 'CONCURRENT_UPDATE_CONFLICT') {
-      saveError.value =
-        'Data has been changed by another process. Please reload the user information and try again.'
+      saveError.value = t('app.users.versionConflict')
     } else {
       saveError.value = apiError.message
     }
@@ -125,7 +127,7 @@ function confirmDiscard() {
 <template>
   <PrismDialog
     :model-value="open"
-    title="User Detail"
+    :title="t('app.users.detailTitle')"
     size="lg"
     :close-on-overlay="false"
     :close-on-escape="false"
@@ -133,63 +135,63 @@ function confirmDiscard() {
     @close="requestClose"
   >
     <div v-if="loading" class="ud-state">
-      <p>Loading user information…</p>
+      <p>{{ t('app.users.detailLoading') }}</p>
     </div>
 
-    <PrismEmptyState v-else-if="loadError" title="Unable to load user information.">
+    <PrismEmptyState v-else-if="loadError" :title="t('app.users.detailLoadError')">
       <p class="ud-error-text">{{ loadError }}</p>
-      <PrismButton variant="secondary" @click="load">Retry</PrismButton>
+      <PrismButton variant="secondary" @click="load">{{ t('app.common.retry') }}</PrismButton>
     </PrismEmptyState>
 
     <form v-else class="ud" @submit.prevent="onSave">
       <p v-if="saveError" class="p-field-error" role="alert">{{ saveError }}</p>
 
-      <PrismInput v-model="userName" label="User Name" required maxlength="100" :disabled="saving" />
-      <PrismInput :model-value="detail?.email ?? ''" label="Email" readonly hint="Email is immutable" />
+      <PrismInput v-model="userName" :label="t('app.users.colUserName')" required maxlength="100" :disabled="saving" />
+      <PrismInput :model-value="detail?.email ?? ''" :label="t('app.users.colEmail')" readonly :hint="t('app.users.emailImmutable')" />
 
       <div class="ud-orgs">
-        <span class="ud-orgs-label">Organization</span>
+        <span class="ud-orgs-label">{{ t('app.common.organization') }}</span>
         <p v-if="detail && detail.orgs.length === 0" class="ud-orgs-empty">—</p>
         <ul v-else class="ud-orgs-list">
           <li v-for="(o, i) in detail?.orgs ?? []" :key="i">
-            {{ o.part }} &gt; {{ o.group }}
+            {{ orgRowLabel(o) }}
           </li>
         </ul>
       </div>
 
       <PrismCombobox
         v-model="role"
-        label="Role"
+        :label="t('app.common.role')"
         :options="ROLE_OPTIONS"
         :disabled="isSelf || saving"
-        :hint="isSelf ? 'You cannot change your own role' : undefined"
+        :hint="isSelf ? t('app.users.cannotChangeOwnRole') : undefined"
       />
       <PrismCombobox
         v-model="status"
-        label="Status"
+        :label="t('app.common.status')"
         :options="STATUS_OPTIONS"
         :disabled="isSelf || saving"
-        :hint="isSelf ? 'You cannot change your own status' : undefined"
+        :hint="isSelf ? t('app.users.cannotChangeOwnStatus') : undefined"
       />
     </form>
 
     <template #footer>
-      <PrismButton variant="secondary" :disabled="saving" @click="requestClose">Cancel</PrismButton>
-      <PrismButton :loading="saving" :disabled="!hasChanges" @click="onSave">Save</PrismButton>
+      <PrismButton variant="secondary" :disabled="saving" @click="requestClose">{{ t('app.common.cancel') }}</PrismButton>
+      <PrismButton :loading="saving" :disabled="!hasChanges" @click="onSave">{{ t('app.common.save') }}</PrismButton>
     </template>
   </PrismDialog>
 
   <PrismDialog
     :model-value="confirmCancel"
-    title="Unsaved changes"
+    :title="t('app.users.unsavedTitle')"
     size="sm"
     :close-on-overlay="false"
     @update:model-value="confirmCancel = $event"
   >
-    <p class="ud-confirm-text">You have unsaved changes. Continue and discard changes?</p>
+    <p class="ud-confirm-text">{{ t('app.users.unsavedDesc') }}</p>
     <template #footer>
-      <PrismButton variant="secondary" @click="confirmCancel = false">Stay</PrismButton>
-      <PrismButton @click="confirmDiscard">Leave</PrismButton>
+      <PrismButton variant="secondary" @click="confirmCancel = false">{{ t('app.common.stay') }}</PrismButton>
+      <PrismButton @click="confirmDiscard">{{ t('app.common.leave') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>

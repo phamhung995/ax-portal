@@ -18,7 +18,7 @@ Hệ thống quản lý Skill (AISTEA) — module **User Management** full-stack
 
 ```text
 backend/
-  src/main/java/com/skillmanagement/
+  src/main/java/com/furelise/skillmanagement/
     controller/    Authentication, AdminUser, User, Home, Notification, Health
     service/       Authentication, AdminUser, User, Home, Notification, Otp, Email, RateLimiter
     model/         User, Role, UserHistory, LoginManagement, OtpManagement, EmailManagement, UserSettings, Notification

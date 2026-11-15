@@ -9,16 +9,20 @@ const props = defineProps({
 })
 const chart = computed(() => {
   const n = Math.max(props.data.length, 3)
-  const cx = props.size / 2
-  const cy = props.size / 2
-  const R = props.size / 2 - 30
+  // Canvas is ~2x wider than tall so the left/right axis labels have room
+  // and are never clipped or overlapping.
+  const W = props.size * 2
+  const H = props.size
+  const cx = W / 2
+  const cy = H / 2
+  const R = props.size / 2 - 22
   const values = props.data.map(d => Number(d.value) || 0)
   const maxValue = props.max || Math.max(...values, 1)
   const angle = i => (Math.PI * 2 * i) / n - Math.PI / 2
   const point = (i, r) => ({ x: cx + Math.cos(angle(i)) * r, y: cy + Math.sin(angle(i)) * r })
   const axes = props.data.map((d, i) => {
     const outer = point(i, R)
-    const labelPos = point(i, R + 16)
+    const labelPos = point(i, R + 10)
     return { label: d.label, x: outer.x, y: outer.y, lx: labelPos.x, ly: labelPos.y, value: values[i] }
   })
   const rings = Array.from({ length: props.levels }, (_, ring) => {
@@ -34,12 +38,12 @@ const chart = computed(() => {
     const r = (values[i] / maxValue) * R
     return point(i, r)
   })
-  return { cx, cy, R, axes, rings, shape, dots, maxValue }
+  return { W, H, cx, cy, R, axes, rings, shape, dots, maxValue }
 })
 </script>
 <template>
 <figure class="p-chart p-radar">
-  <svg :viewBox="`0 0 ${size} ${size}`" role="img" :aria-label="ariaLabel">
+  <svg :viewBox="`0 0 ${chart.W} ${chart.H}`" role="img" :aria-label="ariaLabel">
     <polygon v-for="(ring, i) in chart.rings" :key="i" :points="ring" class="p-radar-ring" :class="{ 'is-outer': i === levels - 1 }" />
     <line v-for="(a, i) in chart.axes" :key="'a' + i" :x1="chart.cx" :y1="chart.cy" :x2="a.x" :y2="a.y" class="p-radar-axis" />
     <polygon :points="chart.shape" class="p-radar-shape" />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 import PrismFormField from '@/design-system/components/PrismFormField.vue'
+import { useI18nStore } from '@/stores/i18n'
 
 /**
  * Chip multi-select for Category / Process Stage form pickers
@@ -20,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits(['update:modelValue'])
 
 const id = useId()
+const { t } = useI18nStore()
 
 function toggle(optionId: number) {
   const next = props.modelValue.includes(optionId)
@@ -43,7 +45,7 @@ function toggle(optionId: number) {
       >
         {{ opt.name }}
       </button>
-      <span v-if="!options.length" class="tcs-ph">{{ placeholder ?? 'No options available.' }}</span>
+      <span v-if="!options.length" class="tcs-ph">{{ placeholder ?? t('app.skills.noOptions') }}</span>
     </div>
   </PrismFormField>
 </template>

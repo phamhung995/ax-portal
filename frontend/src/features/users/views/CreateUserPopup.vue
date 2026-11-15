@@ -8,9 +8,11 @@ import PasswordPolicy from '@/features/auth/components/PasswordPolicy.vue'
 import { adminUserApi } from '@/features/users/api'
 import { toUserError } from '@/lib/api'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { useI18nStore } from '@/stores/i18n'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits(['update:open', 'saved'])
+const { t } = useI18nStore()
 
 const userName = ref('')
 const email = ref('')
@@ -56,14 +58,14 @@ watch(
 )
 
 function validate(): string {
-  if (!userName.value.trim()) return 'User name cannot be empty.'
-  if (!email.value.trim()) return 'Email cannot be empty.'
+  if (!userName.value.trim()) return t('app.users.nameRequired')
+  if (!email.value.trim()) return t('app.users.emailRequired')
   if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email.value.trim())) {
-    return 'Invalid Email format.'
+    return t('app.users.emailInvalid')
   }
-  if (email.value.trim().length > 254) return 'Email is too long (maximum 254 characters).'
-  if (!password.value) return 'Password cannot be empty.'
-  if (password.value !== confirmPassword.value) return 'Password confirmation mismatch.'
+  if (email.value.trim().length > 254) return t('app.users.emailTooLong')
+  if (!password.value) return t('app.users.passwordRequired')
+  if (password.value !== confirmPassword.value) return t('app.users.passwordMismatch')
   return ''
 }
 
@@ -82,7 +84,7 @@ async function onSave() {
       password: password.value,
       confirmPassword: confirmPassword.value,
     })
-    toastSuccess('User created successfully.')
+    toastSuccess(t('app.users.createdToast'))
     emit('saved')
     emit('update:open', false)
   } catch (err) {
@@ -110,7 +112,7 @@ function confirmDiscard() {
 <template>
   <PrismDialog
     :model-value="open"
-    title="Create User"
+    :title="t('app.users.createTitle')"
     size="lg"
     :close-on-overlay="false"
     :close-on-escape="false"
@@ -120,18 +122,18 @@ function confirmDiscard() {
     <form class="cu" @submit.prevent="onSave">
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
 
-      <PrismInput v-model="userName" label="User Name" required maxlength="100" />
+      <PrismInput v-model="userName" :label="t('app.users.colUserName')" required maxlength="100" />
       <PrismInput
         v-model="email"
-        label="Email"
+        :label="t('app.users.colEmail')"
         type="email"
         required
         maxlength="254"
-        hint="Email address can not be changed after creating user"
+        :hint="t('app.users.emailHint')"
       />
       <PrismPasswordInput
         v-model="password"
-        label="Password"
+        :label="t('app.auth.password')"
         required
         :strength="strength"
         autocomplete="new-password"
@@ -139,33 +141,32 @@ function confirmDiscard() {
       <PasswordPolicy :password="password" />
       <PrismPasswordInput
         v-model="confirmPassword"
-        label="Confirm Password"
+        :label="t('app.auth.confirmPassword')"
         required
         autocomplete="new-password"
       />
 
-      <PrismInput model-value="" label="Organization" readonly hint="Assigned by a batch process" />
-      <PrismInput model-value="Normal User" label="Role" readonly />
-      <PrismInput model-value="Active" label="Status" readonly />
+      <PrismInput :model-value="t('app.common.normalUser')" :label="t('app.common.role')" readonly />
+      <PrismInput :model-value="t('app.common.active')" :label="t('app.common.status')" readonly />
     </form>
 
     <template #footer>
-      <PrismButton variant="secondary" :disabled="loading" @click="requestClose">Cancel</PrismButton>
-      <PrismButton :loading="loading" @click="onSave">Save</PrismButton>
+      <PrismButton variant="secondary" :disabled="loading" @click="requestClose">{{ t('app.common.cancel') }}</PrismButton>
+      <PrismButton :loading="loading" @click="onSave">{{ t('app.common.save') }}</PrismButton>
     </template>
   </PrismDialog>
 
   <PrismDialog
     :model-value="confirmCancel"
-    title="Discard changes?"
+    :title="t('app.common.discardTitle')"
     size="sm"
     :close-on-overlay="false"
     @update:model-value="confirmCancel = $event"
   >
-    <p class="cu-confirm-text">Are you sure you want to cancel? The information you entered will not be saved.</p>
+    <p class="cu-confirm-text">{{ t('app.common.discardDescInfo') }}</p>
     <template #footer>
-      <PrismButton variant="secondary" @click="confirmCancel = false">Keep editing</PrismButton>
-      <PrismButton @click="confirmDiscard">Discard</PrismButton>
+      <PrismButton variant="secondary" @click="confirmCancel = false">{{ t('app.common.keepEditing') }}</PrismButton>
+      <PrismButton @click="confirmDiscard">{{ t('app.common.discard') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>

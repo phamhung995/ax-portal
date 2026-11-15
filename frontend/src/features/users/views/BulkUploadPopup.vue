@@ -8,10 +8,12 @@ import PrismBadge from '@/design-system/components/PrismBadge.vue'
 import { adminUserApi } from '@/features/users/api'
 import { toUserError } from '@/lib/api'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { useI18nStore } from '@/stores/i18n'
 import type { BulkRowResult, BulkUploadResponse } from '@/features/users/types'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits(['update:open', 'saved'])
+const { t } = useI18nStore()
 
 const files = ref<File[]>([])
 const uploading = ref(false)
@@ -56,11 +58,11 @@ async function onFileChange() {
   const file = files.value[0]
   if (!file) return
   if (!/\.(xlsx|xls)$/i.test(file.name)) {
-    uploadError.value = 'Only .xlsx and .xls files are supported.'
+    uploadError.value = t('app.users.fileTypeError')
     return
   }
   if (file.size > 10 * 1024 * 1024) {
-    uploadError.value = 'File size is at most 10MB.'
+    uploadError.value = t('app.users.fileSizeError')
     return
   }
   fileName.value = file.name
@@ -82,7 +84,7 @@ async function onSave() {
     const res = await adminUserApi.bulkSave(successRows.value as BulkRowResult[])
     if (res.savedCount > 0) emit('saved')
     toastSuccess(
-      `Bulk upload completed: ${res.savedCount} saved, ${res.skippedCount} skipped.`
+      t('app.users.bulkDoneToast', { saved: res.savedCount, skipped: res.skippedCount })
     )
     emit('update:open', false)
   } catch (err) {
@@ -106,18 +108,18 @@ function confirmDiscard() {
   emit('update:open', false)
 }
 
-const columns = [
-  { key: 'rowNumber', label: 'Row' },
-  { key: 'email', label: 'Email' },
-  { key: 'status', label: 'Result' },
-  { key: 'errors', label: 'Error Message' },
-]
+const columns = computed(() => [
+  { key: 'rowNumber', label: t('app.users.colRow') },
+  { key: 'email', label: t('app.users.bulkColEmail') },
+  { key: 'status', label: t('app.users.colResult') },
+  { key: 'errors', label: t('app.users.colErrorMessage') },
+])
 </script>
 
 <template>
   <PrismDialog
     :model-value="open"
-    title="Bulk Upload"
+    :title="t('app.users.bulkTitle')"
     size="lg"
     :close-on-overlay="false"
     :close-on-escape="false"
@@ -128,10 +130,10 @@ const columns = [
     <section v-if="!hasResult" class="bu-step">
       <PrismFileUpload
         :model-value="files"
-        label="User file"
+        :label="t('app.users.bulkFileLabel')"
         accept=".xlsx,.xls"
         :max-size="10 * 1024 * 1024"
-        hint="One file per upload. Template columns: User Name, Email, Password, Confirm Password. Max 500 rows."
+        :hint="t('app.users.bulkHint')"
         @update:model-value="files = $event as File[]; onFileChange()"
       />
       <p v-if="uploadError" class="p-field-error" role="alert">{{ uploadError }}</p>
@@ -141,18 +143,18 @@ const columns = [
         :disabled="!files.length"
         @click="onFileChange"
       >
-        Upload
+        {{ t('app.users.upload') }}
       </PrismButton>
     </section>
 
     <!-- Step 2: validation result -->
     <section v-else class="bu-step">
       <div class="bu-summary">
-        <p class="bu-file">File: {{ fileName }}</p>
+        <p class="bu-file">{{ t('app.users.fileLabel', { name: fileName }) }}</p>
         <div class="bu-counts">
-          <span>Total Rows: <strong>{{ (result as BulkUploadResponse).totalRows }}</strong></span>
-          <span class="is-success">Success: <strong>{{ (result as BulkUploadResponse).successCount }}</strong></span>
-          <span class="is-error">Error: <strong>{{ (result as BulkUploadResponse).errorCount }}</strong></span>
+          <span>{{ t('app.users.totalRows') }} <strong>{{ (result as BulkUploadResponse).totalRows }}</strong></span>
+          <span class="is-success">{{ t('app.users.successCount') }} <strong>{{ (result as BulkUploadResponse).successCount }}</strong></span>
+          <span class="is-error">{{ t('app.users.errorCount') }} <strong>{{ (result as BulkUploadResponse).errorCount }}</strong></span>
         </div>
       </div>
 
@@ -162,8 +164,8 @@ const columns = [
         :columns="columns"
         :rows="(result as BulkUploadResponse).rows"
         row-key="rowNumber"
-        caption="Bulk upload validation result"
-        empty-text="No rows."
+        :caption="t('app.users.bulkResultCaption')"
+        :empty-text="t('app.users.bulkNoRows')"
       >
         <template #cell-status="{ row }">
           <PrismBadge :tone="(row as BulkRowResult).status === 'SUCCESS' ? 'success' : 'danger'">
@@ -180,7 +182,7 @@ const columns = [
     </section>
 
     <template #footer>
-      <PrismButton variant="secondary" :disabled="saving || uploading" @click="requestClose">Cancel</PrismButton>
+      <PrismButton variant="secondary" :disabled="saving || uploading" @click="requestClose">{{ t('app.common.cancel') }}</PrismButton>
       <PrismButton
         v-if="hasResult"
         type="button"
@@ -188,22 +190,22 @@ const columns = [
         :disabled="!successRows.length"
         @click="onSave"
       >
-        Save
+        {{ t('app.common.save') }}
       </PrismButton>
     </template>
   </PrismDialog>
 
   <PrismDialog
     :model-value="confirmCancel"
-    title="Discard validation result"
+    :title="t('app.users.discardResultTitle')"
     size="sm"
     :close-on-overlay="false"
     @update:model-value="confirmCancel = $event"
   >
-    <p class="bu-confirm-text">You have an unsaved validation result. Continue and discard it?</p>
+    <p class="bu-confirm-text">{{ t('app.users.discardResultDesc') }}</p>
     <template #footer>
-      <PrismButton variant="secondary" @click="confirmCancel = false">Stay</PrismButton>
-      <PrismButton @click="confirmDiscard">Leave</PrismButton>
+      <PrismButton variant="secondary" @click="confirmCancel = false">{{ t('app.common.stay') }}</PrismButton>
+      <PrismButton @click="confirmDiscard">{{ t('app.common.leave') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>

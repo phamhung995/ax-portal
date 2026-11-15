@@ -1,0 +1,9 @@
+/* A neon classroom, with the robot and its handwriting as the focal points. */
+body{background:radial-gradient(ellipse at 76% 14%,#25154466,transparent 52%),radial-gradient(ellipse at 16% 58%,#10365055,transparent 48%),#080d1b}
+.ai-banner{background:radial-gradient(ellipse at 85% 54%,#39216c50,transparent 44%),radial-gradient(ellipse at 22% 64%,#065c7030,transparent 52%),linear-gradient(125deg,#080f21,#10132d 65%,#17122d)}
+.ai-banner::before{background:linear-gradient(110deg,#66f4ff88,#9f69ff22 48%,#f371e555);opacity:.65}
+.prism-window{opacity:.23}.prism-wireframe{opacity:.065}.prism-beam{opacity:.4}
+.neon-halo{opacity:.55}.neon-halo i{border-top-color:#6df5ff88}.neon-halo i:nth-child(2){border-bottom-color:#c57bff88}
+.neon-field{opacity:.65}.pointer-light{opacity:.65}
+.robot-viewport{filter:drop-shadow(0 0 7px #55cfff25) drop-shadow(0 0 16px #b36cff14)}
+@media(max-width:700px){.robot-viewport{filter:drop-shadow(0 0 5px #55cfff22)}}

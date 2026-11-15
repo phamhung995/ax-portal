@@ -1,5 +1,0 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/skill_manager
-    username: postgres
-    password: postgres

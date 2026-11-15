@@ -131,8 +131,11 @@ textarea.p-control { resize: vertical; line-height: 1.6; }
 .p-alert > div { flex: 1; }
 .p-alert strong { font-size: 16px; font-weight: 600; }
 .p-alert-content { color: var(--ds-color-text-secondary); line-height: 1.6; margin-top: 4px; }
-.p-toasts { position: fixed; bottom: var(--ds-space-6); right: var(--ds-space-6); z-index: 100; display: grid; gap: var(--ds-space-3); width: min(380px, calc(100vw - 32px)); }
-.p-toast { display: flex; gap: var(--ds-space-3); align-items: center; padding: var(--ds-space-4); border: 1px solid var(--tone-border); border-radius: var(--ds-radius-md); background: var(--ds-toast-background); color: var(--tone); box-shadow: var(--ds-shadow-glow); font: 16px var(--ds-font-sans); }
+/* Toast container is a popover (top layer — see PrismToast.vue). The UA
+   popover default styles (inset: 0, background: canvas, border: solid)
+   must be reset or an empty container paints a full-height band. */
+.p-toasts { position: fixed; inset: auto; bottom: var(--ds-space-6); right: var(--ds-space-6); z-index: 100; display: grid; gap: var(--ds-space-3); width: fit-content; max-width: min(380px, calc(100vw - 32px)); background: transparent; border: 0; padding: 0; margin: 0; }
+.p-toast { max-width: 100%; display: flex; gap: var(--ds-space-3); align-items: center; padding: var(--ds-space-4); border: 1px solid var(--tone-border); border-radius: var(--ds-radius-md); background: var(--ds-toast-background); color: var(--tone); box-shadow: var(--ds-shadow-glow); font: 16px var(--ds-font-sans); }
 .p-toast > div { flex: 1; }
 .p-toast p { color: var(--ds-color-text-secondary); margin: 5px 0 0; font-size: 15px; }
 .p-progress progress { width: 100%; height: 5px; appearance: none; border: 0; border-radius: 10px; background: rgb(103 232 249 / .08); overflow: hidden; }
@@ -206,6 +209,7 @@ textarea.p-control { resize: vertical; line-height: 1.6; }
 .p-bar-rect { fill: var(--ds-button-primary-background); stroke: var(--ds-color-accent); stroke-opacity: .45; }
 .p-bar-value { fill: var(--ds-color-text-secondary); font: 600 11px var(--ds-font-mono); }
 .p-bar-label, .p-line-label { fill: var(--ds-color-text-muted); font: 11px var(--ds-font-sans); }
+.p-bar-sub { fill: var(--ds-color-text-muted); font: 9px var(--ds-font-mono); }
 .p-line-path { fill: none; stroke: var(--ds-color-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .p-line-dot { fill: var(--ds-color-space-900); stroke: var(--ds-color-accent); stroke-width: 2; }
 .p-donut-track { stroke: rgb(154 182 219 / .12); }

@@ -1,1 +1,0 @@
-org.springframework.context.ApplicationContextInitializer=com.skillmanagement.desktop.config.DesktopDatabaseGuard

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Download, Plus, Search, X, Bell, LayoutGrid, GitBranch, SlidersHorizontal } from 'lucide-vue-next'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismInput from '@/design-system/components/PrismInput.vue'
 import PrismCombobox from '@/design-system/components/PrismCombobox.vue'
 import PrismDatePicker from '@/design-system/components/PrismDatePicker.vue'
+import PrismRadioGroup from '@/design-system/components/PrismRadioGroup.vue'
 import PrismTable from '@/design-system/components/PrismTable.vue'
 import PrismPagination from '@/design-system/components/PrismPagination.vue'
 import PrismBadge from '@/design-system/components/PrismBadge.vue'
@@ -22,25 +23,28 @@ import { stripHtml } from '@/lib/sanitize'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { useSkillListStore } from '@/features/skills/store'
 import { useAuthStore } from '@/stores/auth'
+import { useI18nStore } from '@/stores/i18n'
 import type { SearchUserItem, SkillListItem, TaxonomyOption } from '@/features/skills/types'
 
 const list = useSkillListStore()
 const s = list.state
 const auth = useAuthStore()
 const route = useRoute()
+const { t, formatDate } = useI18nStore()
 
-const STATUS_OPTIONS = [
-  { label: 'Draft', value: 'DRAFT' },
-  { label: 'Pending Approval', value: 'PENDING_APPROVAL' },
-  { label: 'Approved', value: 'APPROVED' },
-  { label: 'Rejected', value: 'REJECTED' },
-]
-const SCOPE_OPTIONS = [
-  { label: 'Private', value: 'PRIVATE' },
-  { label: 'Part', value: 'PART' },
-  { label: 'Group', value: 'GROUP' },
-  { label: 'Public', value: 'PUBLIC' },
-]
+const STATUS_OPTIONS = computed(() => [
+  { label: t('app.common.statusDraft'), value: 'DRAFT' },
+  { label: t('app.common.statusPending'), value: 'PENDING_APPROVAL' },
+  { label: t('app.common.statusApproved'), value: 'APPROVED' },
+  { label: t('app.common.statusRejected'), value: 'REJECTED' },
+])
+const SCOPE_OPTIONS = computed(() => [
+  { label: t('app.skill.scopePrivate'), value: 'PRIVATE' },
+  { label: t('app.skill.scopeProject'), value: 'PROJECT' },
+  { label: t('app.skill.scopePart'), value: 'PART' },
+  { label: t('app.skill.scopeGroup'), value: 'GROUP' },
+  { label: t('app.skill.scopePublic'), value: 'PUBLIC' },
+])
 const PAGE_SIZES = [10, 20, 50, 100]
 
 const addOpen = ref(false)
@@ -74,13 +78,44 @@ const stageOptions = computed(() =>
   stages.value.map((st) => ({ label: st.name, value: st.id }))
 )
 
+// ── System / Sub System filters ────────────────────────────────────────────
+const filterSystems = ref<{ systemKey: string; systemName: string }[]>([])
+const filterSubSystems = ref<{ systemKey: string; subSystemCode: string; subSystemName: string }[]>([])
+
+const systemFilterOptions = computed(() =>
+  filterSystems.value.map((x) => ({ label: x.systemName, value: x.systemKey }))
+)
+const subSystemFilterOptions = computed(() => {
+  const list = s.systemKey
+    ? filterSubSystems.value.filter((x) => x.systemKey === s.systemKey)
+    : filterSubSystems.value
+  return list.map((x) => ({ label: x.subSystemName, value: x.subSystemCode }))
+})
+
+watch(
+  () => s.systemKey,
+  (v, old) => {
+    if (!v || v !== old) s.subSystemCode = ''
+  }
+)
+
 async function loadTaxonomy() {
   try {
-    const t = await skillApi.taxonomy()
-    categories.value = t.categories
-    stages.value = t.stages
+    const taxonomy = await skillApi.taxonomy()
+    categories.value = taxonomy.categories
+    stages.value = taxonomy.stages
   } catch {
     // non-fatal: filters/forms degrade gracefully
+  }
+}
+
+async function loadFilterOptions() {
+  try {
+    const f = await skillApi.filterOptions()
+    filterSystems.value = f.systems
+    filterSubSystems.value = f.subSystems
+  } catch {
+    // non-fatal
   }
 }
 
@@ -97,37 +132,29 @@ function onStageClick(stage: TaxonomyOption) {
   runSearch(true)
 }
 
-/** Count of current-page skills mapped to a stage (pipeline indicator). */
+/** Total skills mapped to a stage under the current search criteria (server-side). */
 function stageCount(stageId: number): number {
-  const name = stageName(stageId)
-  if (!name) return 0
-  return s.items.filter((i) => i.stages.includes(name)).length
-}
-function stageName(stageId: number): string {
-  return stages.value.find((x) => x.id === stageId)?.name ?? ''
+  return s.stageCounts[stageId] ?? 0
 }
 
 const statusLabel = (code: string) =>
-  code === 'PENDING_APPROVAL' ? 'Pending Approval' : code === 'DRAFT' ? 'Draft' : code === 'APPROVED' ? 'Approved' : code === 'REJECTED' ? 'Rejected' : code
+  code === 'PENDING_APPROVAL' ? t('app.common.statusPending') : code === 'DRAFT' ? t('app.common.statusDraft') : code === 'APPROVED' ? t('app.common.statusApproved') : code === 'REJECTED' ? t('app.common.statusRejected') : code
 const statusTone = (code: string) =>
   code === 'APPROVED' ? 'success' : code === 'PENDING_APPROVAL' ? 'warning' : code === 'REJECTED' ? 'danger' : 'neutral'
 // A skill with a pending version update still serves its approved version to
 // other users — show it as Approved for them (creator/admin see the real status).
+// Same for a pending SHARE/SCOPE change (pending_reason set): the skill stays
+// live for its current audience, so it displays as Approved to others.
 const displayStatus = (row: SkillListItem): string =>
-  row.hasPendingVersion && row.creatorId !== auth.user?.userId && !auth.isAdmin ? 'APPROVED' : row.status
+  (row.hasPendingVersion || row.pendingReason != null)
+    && row.creatorId !== auth.user?.userId && !auth.isAdmin && !row.isCowork
+    ? 'APPROVED' : row.status
 const scopeLabel = (code: string) =>
-  code === 'PRIVATE' ? 'Private' : code === 'PART' ? 'Part' : code === 'GROUP' ? 'Group' : code === 'PUBLIC' ? 'Public' : code
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()}`
-}
+  code === 'PRIVATE' ? t('app.skill.scopePrivate') : code === 'PROJECT' ? t('app.skill.scopeProject') : code === 'PART' ? t('app.skill.scopePart') : code === 'GROUP' ? t('app.skill.scopeGroup') : code === 'PUBLIC' ? t('app.skill.scopePublic') : code
 
 const dateRangeError = computed(() => {
   if (s.createdDateFrom && s.createdDateTo && s.createdDateFrom > s.createdDateTo) {
-    return 'From Date cannot be later than To Date.'
+    return t('app.common.dateRangeError')
   }
   return ''
 })
@@ -179,6 +206,9 @@ function buildQuery() {
     scopes: s.scopes.length ? s.scopes : undefined,
     categoryIds: s.categoryIds.length ? s.categoryIds : undefined,
     stageId: s.stageId ?? undefined,
+    subscribed: s.subscribed === 'ALL' ? undefined : s.subscribed,
+    systemKey: s.systemKey || undefined,
+    subSystemCode: s.subSystemCode || undefined,
     page: s.page,
     pageSize: s.pageSize,
     sortBy: s.sortBy,
@@ -193,7 +223,8 @@ async function runSearch(resetPage = true) {
   s.error = ''
   selectedIds.value = new Set()
   try {
-    list.applyResult(await skillApi.search(buildQuery()), auth.user?.userId ?? -1)
+    const result = await skillApi.search(buildQuery())
+    list.applyResult(result, auth.user?.userId ?? -1, result.stageCounts)
   } catch (err) {
     s.error = toUserError(err).message
     s.items = []
@@ -276,11 +307,11 @@ async function toggleSubscribe(row: SkillListItem) {
     if (wasSubscribed) {
       await skillApi.unsubscribe(row.id)
       row.subscribed = false
-      toastSuccess('Unsubscribed successfully.')
+      toastSuccess(t('app.skills.unsubscribedToast'))
     } else {
       await skillApi.subscribe(row.id)
       row.subscribed = true
-      toastSuccess('Subscribed successfully.')
+      toastSuccess(t('app.skills.subscribedToast'))
     }
   } catch (err) {
     toastError(toUserError(err).message)
@@ -290,7 +321,7 @@ async function toggleSubscribe(row: SkillListItem) {
 // ── Export ──────────────────────────────────────────────────────────────────
 async function onExport() {
   if (!s.items.length) {
-    toastError('No data to export. Run a search first.')
+    toastError(t('app.common.noDataToExport'))
     return
   }
   try {
@@ -300,7 +331,7 @@ async function onExport() {
       ? [...selectedIds.value]
       : s.items.map((i) => i.id)
     await skillApi.exportExcel(buildQuery(), ids)
-    toastSuccess('Skill list exported successfully.')
+    toastSuccess(t('app.skills.exportedToast'))
   } catch (err) {
     toastError(toUserError(err).message)
   }
@@ -330,7 +361,7 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await skillApi.deleteBatch(ids)
-    toastSuccess(`Deleted ${ids.length} skill${ids.length > 1 ? 's' : ''}.`)
+    toastSuccess(t('app.skills.deletedToast', { n: ids.length }))
     selectedIds.value = new Set()
     runSearch(false)
   } catch (err) {
@@ -353,20 +384,22 @@ function onTaxonomyChanged() {
 
 const columns = computed(() => [
   { key: 'select', label: '' },
-  { key: 'name', label: 'Skill Name' },
-  { key: 'description', label: 'Description' },
-  { key: 'categories', label: 'Category' },
-  { key: 'stages', label: 'Process Stage' },
-  { key: 'creatorName', label: 'Creator' },
-  { key: 'createdAt', label: 'Created Date' },
-  { key: 'status', label: 'Status' },
-  { key: 'viewCount', label: 'Views' },
-  { key: 'rating', label: 'Rating' },
-  { key: 'subscribe', label: 'Subscribe' },
+  { key: 'name', label: t('app.skills.colName') },
+  { key: 'description', label: t('app.common.description') },
+  { key: 'categories', label: t('app.common.category') },
+  { key: 'stages', label: t('app.common.processStage') },
+  { key: 'creatorName', label: t('app.skills.colCreator') },
+  { key: 'createdAt', label: t('app.common.createdDate') },
+  { key: 'status', label: t('app.common.status') },
+  { key: 'viewCount', label: t('app.skills.colViews') },
+  { key: 'downloadCount', label: t('app.skills.colDownloads') },
+  { key: 'rating', label: t('app.skills.colRating') },
+  { key: 'subscribe', label: t('app.skills.colSubscribe') },
 ])
 
 onMounted(() => {
   loadTaxonomy()
+  loadFilterOptions()
   // Deep-link filters from Home (KPI cards / View All buttons) arrive as
   // route query params — apply them to the search state before loading.
   const q = route.query
@@ -388,6 +421,12 @@ onMounted(() => {
     if (typeof q.scope === 'string') s.scopes = [q.scope]
     if (typeof q.createdFrom === 'string') s.createdDateFrom = q.createdFrom
     if (typeof q.createdTo === 'string') s.createdDateTo = q.createdTo
+    // Home KPI deep-links: Total Views / Average Rating sort, Subscribed filter.
+    if (q.subscribed === '1') s.subscribed = 'Y'
+    if (q.sortBy === 'viewCount' || q.sortBy === 'avgRating') {
+      s.sortBy = q.sortBy
+      s.sortDirection = 'DESC'
+    }
     runSearch(true)
     return
   }
@@ -402,12 +441,25 @@ onMounted(() => {
     runSearch(false)
   }
 })
+
+// ?detail deep-link (Home KPI / notification bell): also handled on query
+// change, so a bell click while already on /skills still opens the popup.
+watch(
+  () => route.query.detail,
+  (raw) => {
+    if (typeof raw !== 'string' || raw === '') return
+    const id = Number(raw)
+    if (Number.isInteger(id) && id > 0) {
+      detailSkillId.value = id
+    }
+  },
+)
 </script>
 
 <template>
   <div class="sm">
     <!-- View tabs: Grid | Process Map -->
-    <div class="sm-view-tabs" role="tablist" aria-label="View">
+    <div class="sm-view-tabs" role="tablist" :aria-label="t('app.common.view')">
       <button
         type="button"
         role="tab"
@@ -416,7 +468,7 @@ onMounted(() => {
         :aria-selected="activeView === 'grid'"
         @click="switchView('grid')"
       >
-        <LayoutGrid :size="15" aria-hidden="true" /> Grid
+        <LayoutGrid :size="15" aria-hidden="true" /> {{ t('app.common.grid') }}
       </button>
       <button
         type="button"
@@ -426,63 +478,75 @@ onMounted(() => {
         :aria-selected="activeView === 'map'"
         @click="switchView('map')"
       >
-        <GitBranch :size="15" aria-hidden="true" /> Process Map
+        <GitBranch :size="15" aria-hidden="true" /> {{ t('app.common.processMap') }}
       </button>
     </div>
 
     <!-- Search area -->
-    <section class="search p-glass" aria-label="Search" @keydown="onSearchKeydown">
+    <section class="search p-glass" :aria-label="t('app.common.searchAria')" @keydown="onSearchKeydown">
       <div class="search-grid">
-        <PrismInput v-model="s.skillName" label="Skill Name" placeholder="Contains…" />
-        <PrismInput v-model="s.description" label="Description" placeholder="Contains…" />
+        <PrismInput v-model="s.skillName" :label="t('app.common.skillName')" :placeholder="t('app.common.containsPh')" />
+        <PrismInput v-model="s.description" :label="t('app.common.description')" :placeholder="t('app.common.containsPh')" />
         <div class="sm-field">
-          <label class="p-label">Tag</label>
-          <div class="sm-tags" role="group" aria-label="Tags">
+          <label class="p-label">{{ t('app.common.tag') }}</label>
+          <div class="sm-tags" role="group" :aria-label="t('app.common.tags')">
             <span v-for="(tag, i) in s.tags" :key="tag" class="sm-tag">
               #{{ tag }}
-              <button type="button" class="sm-tag-remove" aria-label="Remove tag" @click="removeSearchTag(i)">×</button>
+              <button type="button" class="sm-tag-remove" :aria-label="t('app.common.removeTag')" @click="removeSearchTag(i)">×</button>
             </span>
             <input
               v-model="tagInput"
               class="sm-tag-input"
-              placeholder="Type a tag and press Enter…"
+              :placeholder="t('app.common.typeTagPh')"
               @keydown="onTagKeydown"
             />
           </div>
         </div>
         <div class="sm-field">
-          <label class="p-label">Creator</label>
+          <label class="p-label">{{ t('app.skills.colCreator') }}</label>
           <div class="sm-creator">
-            <button type="button" class="sm-creator-search" aria-label="Search user" @click="searchUserOpen = true">
+            <button type="button" class="sm-creator-search" :aria-label="t('app.common.searchUserAria')" @click="searchUserOpen = true">
               <Search :size="16" aria-hidden="true" />
             </button>
             <span v-if="s.creatorName" class="sm-creator-name">{{ s.creatorName }}</span>
-            <span v-else class="sm-creator-placeholder">Select creator</span>
+            <span v-else class="sm-creator-placeholder">{{ t('app.skills.selectCreator') }}</span>
             <button
               v-if="s.creatorId"
               type="button"
               class="sm-creator-clear"
-              aria-label="Clear creator"
+              :aria-label="t('app.skills.clearCreator')"
               @click="s.creatorId = null; s.creatorName = ''"
             >
               <X :size="14" aria-hidden="true" />
             </button>
           </div>
         </div>
-        <PrismCombobox v-model="s.categoryIds" label="Category" placeholder="All Categories" multiple clearable :options="categoryOptions" />
-        <PrismCombobox :model-value="s.stageId ?? ''" label="Stage" placeholder="All Stages" clearable :options="stageOptions" @update:model-value="s.stageId = $event ?? null; runSearch(true)" />
-        <PrismCombobox v-model="s.statuses" label="Status" placeholder="All Statuses" multiple clearable :options="STATUS_OPTIONS" />
-        <PrismCombobox v-model="s.scopes" label="Skill Scope" placeholder="All Scopes" multiple clearable :options="SCOPE_OPTIONS" />
-        <PrismDatePicker v-model="s.createdDateFrom" label="Created From" />
-        <PrismDatePicker v-model="s.createdDateTo" label="Created To" />
+        <PrismCombobox v-model="s.categoryIds" :label="t('app.common.category')" :placeholder="t('app.common.allCategories')" multiple clearable :options="categoryOptions" />
+        <PrismCombobox :model-value="s.stageId ?? ''" :label="t('app.common.processStage')" :placeholder="t('app.common.allStages')" clearable :options="stageOptions" @update:model-value="s.stageId = $event ?? null; runSearch(true)" />
+        <PrismCombobox v-model="s.statuses" :label="t('app.common.status')" :placeholder="t('app.common.allStatuses')" multiple clearable :options="STATUS_OPTIONS" />
+        <PrismCombobox v-model="s.scopes" :label="t('app.skills.colScope')" :placeholder="t('app.common.allScopes')" multiple clearable :options="SCOPE_OPTIONS" />
+        <PrismDatePicker v-model="s.createdDateFrom" :label="t('app.common.createdFrom')" :placeholder="t('app.common.selectDatePh')" />
+        <PrismDatePicker v-model="s.createdDateTo" :label="t('app.common.createdTo')" :placeholder="t('app.common.selectDatePh')" />
+        <PrismCombobox v-model="s.systemKey" :label="t('app.skill.searchSystem')" :placeholder="t('app.skill.searchAllSystems')" clearable :options="systemFilterOptions" />
+        <PrismCombobox v-model="s.subSystemCode" :label="t('app.skill.searchSubSystem')" :placeholder="t('app.skill.searchAllSubSystems')" clearable :options="subSystemFilterOptions" />
+        <PrismRadioGroup
+          v-model="s.subscribed"
+          :label="t('app.skills.colSubscribe')"
+          inline
+          :options="[
+            { value: 'ALL', label: t('app.skills.subscribeAll') },
+            { value: 'Y', label: t('app.skills.subscribeY') },
+            { value: 'N', label: t('app.skills.subscribeN') },
+          ]"
+        />
       </div>
       <p v-if="dateRangeError" class="p-field-error" role="alert">{{ dateRangeError }}</p>
       <div class="search-actions">
         <PrismButton type="button" @click="addOpen = true">
-          <Plus :size="16" aria-hidden="true" /> Add Skill
+          <Plus :size="16" aria-hidden="true" /> {{ t('app.skills.addBtn') }}
         </PrismButton>
         <PrismButton variant="secondary" type="button" @click="onExport">
-          <Download :size="16" aria-hidden="true" /> Download Excel
+          <Download :size="16" aria-hidden="true" /> {{ t('app.skills.downloadExcel') }}
         </PrismButton>
         <PrismButton
           v-if="selectedIds.size"
@@ -490,20 +554,20 @@ onMounted(() => {
           type="button"
           @click="onDelete"
         >
-          Delete ({{ selectedIds.size }})
+          {{ t('app.skills.deleteBtn', { n: selectedIds.size }) }}
         </PrismButton>
         <PrismButton v-if="auth.isAdmin" variant="secondary" type="button" @click="manageOpen = true">
-          <SlidersHorizontal :size="16" aria-hidden="true" /> Manage Categories &amp; Stages
-          <span class="sm-admin-tag">admin</span>
+          <SlidersHorizontal :size="16" aria-hidden="true" /> {{ t('app.skills.manageTaxonomy') }}
+          <span class="sm-admin-tag">{{ t('app.skills.adminBadge') }}</span>
         </PrismButton>
         <span class="search-actions-spacer" aria-hidden="true"></span>
-        <PrismButton type="button" :loading="s.loading" @click="onSearch">Search</PrismButton>
-        <PrismButton variant="secondary" type="button" @click="onReset">Reset</PrismButton>
+        <PrismButton type="button" :loading="s.loading" @click="onSearch">{{ t('app.common.search') }}</PrismButton>
+        <PrismButton variant="secondary" type="button" @click="onReset">{{ t('app.common.reset') }}</PrismButton>
       </div>
     </section>
 
     <!-- Process map pipeline (map view only) -->
-    <section v-if="activeView === 'map'" class="map-panel p-glass" aria-label="Process map">
+    <section v-if="activeView === 'map'" class="map-panel p-glass" :aria-label="t('app.common.processMapAria')">
       <div class="map-pipeline">
         <button
           v-for="(stage, i) in stages"
@@ -520,22 +584,22 @@ onMounted(() => {
           <span v-if="stage.description" class="map-stage-desc">{{ stage.description }}</span>
           <span class="map-stage-count">
             <span class="map-stage-count-num">{{ stageCount(stage.id) }}</span>
-            skill{{ stageCount(stage.id) === 1 ? '' : 's' }}
+            {{ t('app.skills.skillCount', { n: stageCount(stage.id) }) }}
           </span>
         </button>
       </div>
     </section>
 
     <!-- Grid (table view) -->
-    <section v-if="activeView === 'grid'" class="grid p-glass" aria-label="Skill list">
+    <section v-if="activeView === 'grid'" class="grid p-glass" :aria-label="t('app.skills.listAria')">
       <PrismEmptyState
         v-if="!s.hasSearched && !s.loading && !s.error"
-        title="No data found."
-        description="Enter search criteria and click Search to load skills."
+        :title="t('app.common.noDataFound')"
+        :description="t('app.skills.emptyDesc')"
       />
-      <PrismEmptyState v-else-if="s.error" title="Unable to load skill list.">
+      <PrismEmptyState v-else-if="s.error" :title="t('app.skills.loadError')">
         <p class="grid-error-text">{{ s.error }}</p>
-        <PrismButton variant="secondary" @click="onSearch">Retry</PrismButton>
+        <PrismButton variant="secondary" @click="onSearch">{{ t('app.common.retry') }}</PrismButton>
       </PrismEmptyState>
       <template v-else>
         <div @dblclick="onGridDblClick">
@@ -544,14 +608,14 @@ onMounted(() => {
           :rows="s.items"
           row-key="id"
           :loading="s.loading"
-          caption="Skill list"
-          empty-text="No data found."
+          :caption="t('app.common.total', { n: s.totalCount })"
+          :empty-text="t('app.common.noDataFound')"
         >
           <template #header-select>
             <input
               type="checkbox"
               :checked="allSelected"
-              aria-label="Select all rows on this page"
+              :aria-label="t('app.common.selectAllRows')"
               @change="toggleAll()"
             />
           </template>
@@ -559,7 +623,7 @@ onMounted(() => {
             <input
               type="checkbox"
               :checked="selectedIds.has((row as SkillListItem).id)"
-              :aria-label="`Select ${(row as SkillListItem).name}`"
+              :aria-label="t('app.common.selectRow', { name: (row as SkillListItem).name })"
               @change="toggleRow((row as SkillListItem).id)"
             />
           </template>
@@ -593,18 +657,34 @@ onMounted(() => {
             {{ formatDate((row as SkillListItem).createdAt) }}
           </template>
           <template #cell-status="{ row }">
-            <PrismBadge :tone="statusTone(displayStatus(row as SkillListItem))">
-              {{ statusLabel(displayStatus(row as SkillListItem)) }}
-            </PrismBadge>
+            <div class="sm-status-cell">
+              <PrismBadge :tone="statusTone(displayStatus(row as SkillListItem))">
+                {{ statusLabel(displayStatus(row as SkillListItem)) }}
+              </PrismBadge>
+              <!-- The admin/creator sees how many shares are awaiting approval
+                   on a SHARE-pending skill. -->
+              <span
+                v-if="(row as SkillListItem).status === 'PENDING_APPROVAL'
+                  && (row as SkillListItem).pendingReason === 'SHARE'
+                  && (row as SkillListItem).pendingShareCount > 0
+                  && (auth.isAdmin || (row as SkillListItem).creatorId === auth.user?.userId)"
+                class="sm-pending-count"
+              >
+                {{ t('app.skill.pendingSharesCount', { count: (row as SkillListItem).pendingShareCount }) }}
+              </span>
+            </div>
           </template>
           <template #cell-viewCount="{ row }">
             {{ (row as SkillListItem).viewCount }}
+          </template>
+          <template #cell-downloadCount="{ row }">
+            {{ (row as SkillListItem).downloadCount }}
           </template>
           <template #cell-rating="{ row }">
             <span v-if="(row as SkillListItem).avgRating != null" class="sm-rating">
               ★ {{ (row as SkillListItem).avgRating!.toFixed(1) }} ({{ (row as SkillListItem).ratingCount }})
             </span>
-            <span v-else class="sm-norating">No rating</span>
+            <span v-else class="sm-norating">{{ t('app.common.noRating') }}</span>
           </template>
           <template #cell-subscribe="{ row }">
             <button
@@ -612,7 +692,7 @@ onMounted(() => {
               type="button"
               class="sm-bell"
               :class="{ 'is-subscribed': (row as SkillListItem).subscribed }"
-              :aria-label="(row as SkillListItem).subscribed ? 'Unsubscribe' : 'Subscribe'"
+              :aria-label="t('app.skills.colSubscribe')"
               @click="toggleSubscribe(row as SkillListItem)"
             >
               <Bell :size="16" :fill="(row as SkillListItem).subscribed ? 'currentColor' : 'none'" aria-hidden="true" />
@@ -622,12 +702,16 @@ onMounted(() => {
         </div>
 
         <div class="sm-pager">
-          <label class="sm-pagesize">
-            Rows
-            <select :value="s.pageSize" @change="onPageSize(Number(($event.target as HTMLSelectElement).value))">
-              <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
-            </select>
-          </label>
+          <div class="sm-pagesize">
+            <span class="sm-pagesize-label">{{ t('app.common.rows') }}</span>
+            <PrismCombobox
+              :model-value="s.pageSize"
+              readonly
+              :aria-label="t('app.common.rowsPerPage')"
+              :options="PAGE_SIZES.map((size) => ({ value: size, label: String(size) }))"
+              @update:model-value="onPageSize(Number($event))"
+            />
+          </div>
           <PrismPagination
             :page="s.page"
             :page-size="s.pageSize"
@@ -639,15 +723,15 @@ onMounted(() => {
     </section>
 
     <!-- Card grid (Process Map view) -->
-    <section v-else class="grid p-glass" aria-label="Skill cards">
+    <section v-else class="grid p-glass" :aria-label="t('app.skills.cardsAria')">
       <PrismEmptyState
         v-if="!s.hasSearched && !s.loading && !s.error"
-        title="No data found."
-        description="Enter search criteria and click Search to load skills."
+        :title="t('app.common.noDataFound')"
+        :description="t('app.skills.emptyDesc')"
       />
-      <PrismEmptyState v-else-if="s.error" title="Unable to load skill list.">
+      <PrismEmptyState v-else-if="s.error" :title="t('app.skills.loadError')">
         <p class="grid-error-text">{{ s.error }}</p>
-        <PrismButton variant="secondary" @click="onSearch">Retry</PrismButton>
+        <PrismButton variant="secondary" @click="onSearch">{{ t('app.common.retry') }}</PrismButton>
       </PrismEmptyState>
       <template v-else>
         <div v-if="s.items.length" class="card-grid">
@@ -674,21 +758,25 @@ onMounted(() => {
             <div class="sc-foot">
               <span>{{ item.creatorName ?? '—' }}</span>
               <span aria-hidden="true">·</span>
-              <span>{{ item.viewCount }} views</span>
+              <span>{{ t('app.common.views', { n: item.viewCount }) }}</span>
               <span v-if="item.avgRating != null" class="sc-rating">★ {{ item.avgRating.toFixed(1) }}</span>
-              <span v-else class="sc-norating">No rating</span>
+              <span v-else class="sc-norating">{{ t('app.common.noRating') }}</span>
             </div>
           </div>
         </div>
-        <PrismEmptyState v-else title="No data found." description="No skills match the current filters." />
+        <PrismEmptyState v-else :title="t('app.common.noDataFound')" :description="t('app.skills.noMatchDesc')" />
 
         <div class="sm-pager">
-          <label class="sm-pagesize">
-            Rows
-            <select :value="s.pageSize" @change="onPageSize(Number(($event.target as HTMLSelectElement).value))">
-              <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
-            </select>
-          </label>
+          <div class="sm-pagesize">
+            <span class="sm-pagesize-label">{{ t('app.common.rows') }}</span>
+            <PrismCombobox
+              :model-value="s.pageSize"
+              readonly
+              :aria-label="t('app.common.rowsPerPage')"
+              :options="PAGE_SIZES.map((size) => ({ value: size, label: String(size) }))"
+              @update:model-value="onPageSize(Number($event))"
+            />
+          </div>
           <PrismPagination
             :page="s.page"
             :page-size="s.pageSize"
@@ -718,41 +806,40 @@ onMounted(() => {
     <!-- Delete confirm -->
     <PrismDialog
       v-model="deleteConfirm"
-      title="Delete skills"
+      :title="t('app.skills.deleteTitle')"
       size="sm"
       :close-on-overlay="false"
     >
       <p class="sm-confirm-text">
-        Are you sure you want to delete the selected {{ selectedIds.size }} skill{{ selectedIds.size > 1 ? 's' : '' }}?
+        {{ t('app.skills.deleteDesc', { n: selectedIds.size }) }}
       </p>
       <template #footer>
-        <PrismButton variant="secondary" @click="deleteConfirm = false">Cancel</PrismButton>
-        <PrismButton variant="danger" :loading="deleting" @click="confirmDelete">Delete</PrismButton>
+        <PrismButton variant="secondary" @click="deleteConfirm = false">{{ t('app.common.cancel') }}</PrismButton>
+        <PrismButton variant="danger" :loading="deleting" @click="confirmDelete">{{ t('app.common.delete') }}</PrismButton>
       </template>
     </PrismDialog>
 
     <!-- Delete denied alert -->
     <PrismDialog
       v-model="deleteDeniedOpen"
-      title="Cannot delete all selected skills"
+      :title="t('app.skills.cannotDeleteTitle')"
       size="md"
       :close-on-overlay="false"
     >
       <p class="sm-confirm-text">
-        You do not have permission to delete one or more selected Skills.
+        {{ t('app.skills.cannotDeleteDesc') }}
       </p>
-      <p class="sm-denied-title">Skills you cannot delete:</p>
+      <p class="sm-denied-title">{{ t('app.skills.cannotDeleteList') }}</p>
       <ul class="sm-denied-list">
         <li v-for="d in deleteDenied" :key="d.id">
-          {{ d.name }} (created by {{ d.creatorName ?? 'unknown' }})
+          {{ t('app.skills.cannotDeleteItem', { name: d.name, creator: d.creatorName ?? t('app.common.unknown') }) }}
         </li>
       </ul>
       <p class="sm-confirm-text">
-        Total: {{ selectedIds.size }} skill{{ selectedIds.size > 1 ? 's' : '' }} selected,
-        {{ deleteDenied.length }} cannot be deleted.
+        {{ t('app.skills.cannotDeleteTotal', { n: selectedIds.size, m: deleteDenied.length }) }}
       </p>
       <template #footer>
-        <PrismButton @click="deleteDeniedOpen = false">Close</PrismButton>
+        <PrismButton @click="deleteDeniedOpen = false">{{ t('app.common.close') }}</PrismButton>
       </template>
     </PrismDialog>
   </div>
@@ -763,17 +850,19 @@ onMounted(() => {
   display: grid;
   gap: var(--ds-space-4);
   width: 100%;
+  /* Pull the tab bar up against the app header (main padding is 16px) */
+  margin-top: calc(-1 * var(--ds-space-2));
 }
 
 .search {
-  padding: var(--ds-space-5);
+  padding: var(--ds-space-4);
   display: grid;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 .search-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 @media (max-width: 1199px) {
   .search-grid {
@@ -787,27 +876,49 @@ onMounted(() => {
 }
 .sm-field {
   display: grid;
-  gap: var(--ds-space-2);
+  gap: var(--ds-space-1);
+  font-size: 13px;
+  min-width: 0;
+  align-content: start;
 }
 .sm-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ds-space-2);
-  padding: var(--ds-space-2);
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: 0 var(--ds-space-3);
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
   background: var(--ds-input-background);
+  /* 36px = 34px input + 2px border, matches .p-input-wrap in compact mode */
+  min-height: 36px;
+  box-sizing: border-box;
+  font-size: 13px;
+  transition: border-color var(--ds-duration-fast), background var(--ds-duration-fast), box-shadow var(--ds-duration-fast);
+}
+@media (hover: hover) {
+  .sm-tags:hover:not(:focus-within),
+  .sm-creator:hover {
+    border-color: var(--ds-color-border-strong);
+    background: var(--ds-input-hover-background);
+  }
+}
+.sm-tags:focus-within,
+.sm-creator:focus-within {
+  border-color: var(--ds-color-accent);
+  background: var(--ds-input-focus-background);
+  box-shadow: 0 0 0 3px rgb(103 232 249 / .10), 0 0 14px rgb(103 232 249 / .05);
 }
 .sm-tag {
   display: inline-flex;
   align-items: center;
   gap: var(--ds-space-1);
-  padding: 2px var(--ds-space-2);
+  padding: 1px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
   background: rgb(103 232 249 / .06);
   color: var(--ds-color-text-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
 .sm-tag-remove {
   border: none;
@@ -822,6 +933,7 @@ onMounted(() => {
 .sm-tag-input {
   flex: 1;
   min-width: 120px;
+  min-height: 34px;
   border: none;
   background: none;
   color: var(--ds-color-text-primary);
@@ -829,15 +941,24 @@ onMounted(() => {
   padding: 2px 0;
   outline: none;
 }
+.sm-tag-input::placeholder {
+  color: var(--ds-color-text-muted);
+}
 .sm-creator {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  padding: 8px 10px;
+  padding: 0 10px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
   background: var(--ds-input-background);
   color: var(--ds-color-text-primary);
+  /* 36px = 34px input + 2px border, matches .p-input-wrap in compact mode */
+  min-height: 36px;
+  box-sizing: border-box;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--ds-duration-fast), background var(--ds-duration-fast), box-shadow var(--ds-duration-fast);
 }
 .sm-creator-placeholder {
   color: var(--ds-color-text-secondary);
@@ -920,19 +1041,35 @@ onMounted(() => {
   margin-top: var(--ds-space-4);
   flex-wrap: wrap;
 }
+/* Rows (page size) — compact: label + 30px combobox, narrow width. */
 .sm-pagesize {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: 13px;
+  flex-shrink: 0;
+}
+.sm-pagesize-label {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ds-color-text-secondary);
 }
-.sm-pagesize select {
-  background: var(--ds-input-background);
-  border: 1px solid var(--ds-color-border);
-  color: var(--ds-color-text-primary);
-  border-radius: var(--ds-radius-sm);
-  padding: 6px 8px;
+/* The combobox has no label of its own — PrismFormField still renders an
+   empty <label> row; hide it so the control sits on the same line as "Rows". */
+.sm-pagesize :deep(.p-field) {
+  gap: 0;
+}
+.sm-pagesize :deep(.p-field > label:empty) {
+  display: none;
+}
+.sm-pagesize :deep(.p-combobox) {
+  width: 84px;
+  font-size: 12px;
+}
+.sm-pagesize :deep(.p-input-wrap),
+.sm-pagesize :deep(.p-input-wrap) input {
+  min-height: 30px;
+  font-size: 12px;
+  padding: 0 var(--ds-space-2);
 }
 .sm-confirm-text {
   color: var(--ds-color-text-primary);
@@ -1165,5 +1302,16 @@ onMounted(() => {
 .sc-norating {
   margin-left: auto;
   color: var(--ds-color-text-muted);
+}
+.sm-status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.sm-pending-count {
+  font-size: 11px;
+  color: var(--ds-color-warning, #b45309);
+  white-space: nowrap;
 }
 </style>

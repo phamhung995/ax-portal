@@ -7,7 +7,10 @@ import PrismAmbientBackground from '@/design-system/components/PrismAmbientBackg
 import OtpStep from '@/features/auth/components/OtpStep.vue'
 import { authApi } from '@/features/auth/api'
 import { toUserError } from '@/lib/api'
+import { useI18nStore } from '@/stores/i18n'
 
+const i18n = useI18nStore()
+const { t } = i18n
 const router = useRouter()
 const step = ref<'email' | 'otp'>('email')
 const email = ref('')
@@ -21,7 +24,7 @@ const error = ref('')
 async function onSendOtp() {
   error.value = ''
   if (!email.value) {
-    error.value = 'Email is required.'
+    error.value = t('app.auth.emailRequired')
     return
   }
   loading.value = true
@@ -82,31 +85,31 @@ async function onResend() {
   <div class="auth-page">
     <PrismAmbientBackground />
     <form v-if="step === 'email'" class="auth-card p-glass" @submit.prevent="onSendOtp">
-      <h1 class="auth-title">Forgot Password</h1>
-      <p class="auth-subtitle">Enter your Email to receive a verification code.</p>
+      <h1 class="auth-title">{{ t('app.auth.forgotTitle') }}</h1>
+      <p class="auth-subtitle">{{ t('app.auth.forgotSubtitle') }}</p>
 
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
 
       <PrismInput
         v-model="email"
-        label="Email"
+        :label="t('app.common.email')"
         type="email"
-        placeholder="you@company.com"
+        :placeholder="t('app.common.emailPh')"
         autocomplete="email"
         required
       />
 
-      <PrismButton type="submit" :loading="loading">Send OTP</PrismButton>
+      <PrismButton type="submit" :loading="loading">{{ t('app.auth.sendOtp') }}</PrismButton>
 
       <p class="auth-register">
-        <RouterLink to="/login">Back to Login</RouterLink>
+        <RouterLink to="/login">{{ t('app.auth.backToLogin') }}</RouterLink>
       </p>
     </form>
 
     <form v-else class="auth-card p-glass" @submit.prevent="onVerify">
-      <h1 class="auth-title">Verify Your Email</h1>
+      <h1 class="auth-title">{{ t('app.auth.verifyTitle') }}</h1>
       <p class="auth-subtitle">
-        If an account exists for <strong>{{ email }}</strong>, a 6-digit code has been sent.
+        {{ t('app.auth.forgotVerifyDesc', { email }) }}
       </p>
 
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
@@ -122,7 +125,7 @@ async function onResend() {
       />
 
       <p class="auth-register">
-        <button type="button" class="linklike" @click="step = 'email'">Back</button>
+        <button type="button" class="linklike" @click="step = 'email'">{{ t('app.auth.back') }}</button>
       </p>
     </form>
   </div>

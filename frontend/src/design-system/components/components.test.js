@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { createPinia } from 'pinia'
 import * as components from './index'
 const { PrismButton, PrismInput, PrismSelect, PrismCheckbox, PrismSwitch, PrismTabs, PrismAccordion, PrismPagination, PrismToast, PrismTable, PrismGrid, PrismBarChart, PrismLineChart, PrismDonutChart, PrismSparkline, PrismAmbientBackground, PrismDatePicker, PrismDateRangePicker, PrismDatetimePicker, PrismRadioGroup, PrismNumberInput, PrismPasswordInput, PrismCombobox, PrismTooltip, PrismTree, PrismGauge, PrismHeatmap, PrismStackedBarChart, PrismAvatar, PrismBreadcrumbs, PrismStat, PrismTimeline, PrismList, PrismKbd, PrismDivider, PrismDropdownMenu, PrismPopover, PrismFileUpload, PrismColorPicker, PrismAreaChart, PrismRadarChart, PrismAvatarGroup, PrismRadio } = components
 afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers() })
@@ -72,24 +73,24 @@ describe('Public component contracts', () => {
     expect(wrapper.emitted('update:modelValue')[0]).toEqual([['b']])
   })
   it('pagination prevents navigation beyond bounds', async () => {
-    const wrapper = mount(PrismPagination, { props: { page: 1, pageSize: 3, total: 5 } })
-    expect(wrapper.get('[aria-label="Trang trước"]').element.disabled).toBe(true)
-    await wrapper.get('[aria-label="Trang sau"]').trigger('click')
+    const wrapper = mount(PrismPagination, { props: { page: 1, pageSize: 3, total: 5 }, global: { plugins: [createPinia()] } })
+    expect(wrapper.get('[aria-label="Previous page"]').element.disabled).toBe(true)
+    await wrapper.get('[aria-label="Next page"]').trigger('click')
     expect(wrapper.emitted('update:page')[0]).toEqual([2])
     await wrapper.setProps({ page: 2 })
-    expect(wrapper.get('[aria-label="Trang sau"]').element.disabled).toBe(true)
+    expect(wrapper.get('[aria-label="Next page"]').element.disabled).toBe(true)
   })
   it('table distinguishes empty from loading and renders semantic headers', async () => {
-    const wrapper = mount(PrismTable, { props: { caption: 'Dự án', columns: [{ key: 'name', label: 'Tên' }], rows: [] } })
-    expect(wrapper.text()).toContain('Không có dữ liệu')
+    const wrapper = mount(PrismTable, { props: { caption: 'Dự án', columns: [{ key: 'name', label: 'Tên' }], rows: [] }, global: { plugins: [createPinia()] } })
+    expect(wrapper.text()).toContain('No data.')
     expect(wrapper.get('th').attributes('scope')).toBe('col')
     // table được bọc trong wrapper scroll ngang để không tràn container
     const scroll = wrapper.find('.p-table-scroll')
     expect(scroll.exists()).toBe(true)
     expect(scroll.find('table.p-table').exists()).toBe(true)
     await wrapper.setProps({ loading: true })
-    expect(wrapper.text()).toContain('Đang tải')
-    expect(wrapper.text()).not.toContain('Không có dữ liệu')
+    expect(wrapper.text()).toContain('Loading')
+    expect(wrapper.text()).not.toContain('No data.')
   })
   it('toast pauses its remaining lifetime during hover and resumes', async () => {
     vi.useFakeTimers()
@@ -151,7 +152,8 @@ describe('Public component contracts', () => {
     wrapper.unmount()
   })
   it('date picker respects min/max disabled days', async () => {
-    const wrapper = mount(PrismDatePicker, { attachTo: document.body, props: { label: 'Ngày', min: '2026-09-10', max: '2026-09-20' } })
+    // modelValue ở tháng 9/2026 để calendar mở đúng tháng chứa các ngày min/max.
+    const wrapper = mount(PrismDatePicker, { attachTo: document.body, props: { modelValue: '2026-09-15', label: 'Ngày', min: '2026-09-10', max: '2026-09-20' } })
     await wrapper.get('input').trigger('click')
     const before = document.querySelector('.p-calendar-day[aria-label="2026-09-05"]')
     const after = document.querySelector('.p-calendar-day[aria-label="2026-09-25"]')
@@ -160,11 +162,14 @@ describe('Public component contracts', () => {
     wrapper.unmount()
   })
   it('date range picker emits [start, end] after two selections', async () => {
+    // Component controlled: sau click 1 (đặt lại start), parent phải update
+    // modelValue về ['2026-09-10', ''] để click 2 được xử lý là chọn end.
     const wrapper = mount(PrismDateRangePicker, { attachTo: document.body, props: { modelValue: ['2026-09-01', ''], label: 'Khoảng' } })
     await wrapper.get('input').trigger('click')
     const days = () => [...document.querySelectorAll('.p-calendar-day')]
     await days().find(d => d.getAttribute('aria-label') === '2026-09-10').click()
     expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['2026-09-10', '']])
+    await wrapper.setProps({ modelValue: ['2026-09-10', ''] })
     await days().find(d => d.getAttribute('aria-label') === '2026-09-15').click()
     expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['2026-09-10', '2026-09-15']])
     expect(document.querySelector('.p-date-popup')).toBeNull()
@@ -331,7 +336,14 @@ describe('Public component contracts', () => {
     expect(wrapper.text()).toContain('72')
   })
   it('heatmap renders one cell per day with intensity level', () => {
-    const wrapper = mount(PrismHeatmap, { props: { data: [{ date: '2026-09-24', value: 5 }, { date: '2026-09-23', value: 1 }], weeks: 4 } })
+    // Component render khung kết thúc ở "hôm nay" — dùng date tương đối để
+    // data luôn nằm trong khung 4 tuần (date cố định sẽ trôi ra ngoài khung).
+    // ISO phải ghép từ local date parts (giống component), không dùng toISOString (UTC).
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const wrapper = mount(PrismHeatmap, { props: { data: [{ date: iso(today), value: 5 }, { date: iso(yesterday), value: 1 }], weeks: 4 } })
     expect(wrapper.find('svg').attributes('role')).toBe('img')
     const cells = wrapper.findAll('.p-heatmap-cell')
     expect(cells.length).toBeGreaterThan(0)
@@ -413,7 +425,7 @@ describe('Public component contracts', () => {
     wrapper.unmount()
   })
   it('file upload accepts valid files and rejects by type', async () => {
-    const wrapper = mount(PrismFileUpload, { props: { modelValue: [], label: 'Tài liệu', accept: '.pdf', multiple: true } })
+    const wrapper = mount(PrismFileUpload, { props: { modelValue: [], label: 'Tài liệu', accept: '.pdf', multiple: true }, global: { plugins: [createPinia()] } })
     const pdf = new File(['%PDF-1.4'], 'doc.pdf', { type: 'application/pdf' })
     const png = new File(['x'], 'img.png', { type: 'image/png' })
     const input = wrapper.get('input[type=file]').element
@@ -422,7 +434,7 @@ describe('Public component contracts', () => {
     const emitted = wrapper.emitted('update:modelValue').at(-1)[0]
     expect(emitted.length).toBe(1)
     expect(emitted[0].name).toBe('doc.pdf')
-    expect(wrapper.text()).toContain('Loại file không hợp lệ')
+    expect(wrapper.text()).toContain('Invalid file type')
     await wrapper.setProps({ modelValue: emitted })
     await wrapper.get('.p-fileupload-remove').trigger('click')
     expect(wrapper.emitted('update:modelValue').at(-1)[0]).toEqual([])

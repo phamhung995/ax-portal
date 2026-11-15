@@ -1,0 +1,30 @@
+/* Neon overlays never intercept pointer events. */
+@property --neon-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+.ai-banner{box-shadow:0 0 22px #6457ff20,0 0 70px #a341eb12,inset 0 0 30px #4737f51a}
+.ai-banner::before{content:'';position:absolute;inset:0;z-index:5;border-radius:inherit;padding:1.5px;background:conic-gradient(from var(--neon-angle),#65f9ff08 0deg,#65f9ff 65deg,#ad72ff 110deg,#ff71d9 160deg,#65f9ff08 220deg,#65f9ff08 300deg,#65f9ff 350deg);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:neon-border 12s linear infinite;pointer-events:none}
+.neon-aurora,.neon-field{position:absolute;inset:0;pointer-events:none}
+.neon-aurora{background:radial-gradient(ellipse at 74% 47%,#3ef5ff18,transparent 35%),radial-gradient(ellipse at 27% 83%,#ff35dc1c,transparent 47%);mix-blend-mode:screen;animation:neon-breathe 7s ease-in-out infinite alternate}
+.neon-field{overflow:hidden}
+.neon-field i{position:absolute;left:var(--x);top:var(--y);width:3px;height:3px;border-radius:50%;color:var(--neon);background:currentColor;box-shadow:0 0 6px currentColor,0 0 14px currentColor;opacity:.45;animation:neon-drift var(--duration) var(--delay) ease-in-out infinite}
+.neon-field i:nth-child(4n){width:2px;height:12px;border-radius:50%;opacity:.25}
+.neon-halo{position:absolute;left:61%;top:8%;width:31%;height:84%;pointer-events:none;opacity:.65;transition:opacity .5s}
+.neon-halo i{position:absolute;inset:8% 0;border:1px solid #68efff22;border-top-color:#80ffff;border-right-color:#a992ff88;border-radius:50%;box-shadow:0 -3px 15px #55e7ff26,inset 0 2px 15px #69efff12;transform:rotate(-22deg);animation:neon-orbit 16s linear infinite}
+.neon-halo i::before{content:'';position:absolute;left:19%;top:9%;width:6px;height:6px;border-radius:50%;background:#caffff;box-shadow:0 0 9px 3px #62edff,0 0 24px #62edff}
+.neon-halo i:nth-child(2){inset:1% 9%;border-color:#f27de61a;border-bottom-color:#ff7be9;box-shadow:0 3px 16px #ff63da22;animation-direction:reverse;animation-duration:23s}
+.neon-halo i:nth-child(2)::before{background:#ffe5fb;box-shadow:0 0 9px 3px #ff75d8,0 0 24px #ff75d8}
+.pointer-light{width:28%;background:radial-gradient(circle,#a6ffff20 0,#688cff16 20%,#b85fff0b 40%,transparent 65%);mix-blend-mode:screen}
+.robot img{filter:drop-shadow(0 0 5px #7af5ff55) drop-shadow(0 0 15px #ae66ff38);animation:neon-robot 5s ease-in-out infinite alternate}
+.speech{border-color:#ad8dff88;box-shadow:0 0 18px #8d69ff22,inset 0 0 15px #b16cff0d}
+.spark{width:4px;height:4px;background:#c7ffff;box-shadow:0 0 6px 2px #5df5ff,0 0 17px #a77cff}
+.neon-ripple{position:absolute;width:100px;aspect-ratio:1;border:1px solid #9afaff;border-radius:50%;box-shadow:0 0 12px #6be8ff88,inset 0 0 12px #cb6cff55;pointer-events:none}
+.ai-banner.sleeping .neon-halo{opacity:.2}
+.ai-banner.sleeping .neon-field{opacity:.4}
+.ai-banner.sleeping .robot img{animation:none;filter:drop-shadow(0 0 6px #a38bff33)}
+.ai-banner.reduced::before,.ai-banner.reduced .neon-aurora,.ai-banner.reduced .neon-field i,.ai-banner.reduced .neon-halo i,.ai-banner.reduced .robot img{animation:none!important}
+@keyframes neon-border{to{--neon-angle:360deg}}
+@keyframes neon-breathe{from{opacity:.45;transform:scale(1)}to{opacity:1;transform:scale(1.1)}}
+@keyframes neon-drift{0%,100%{transform:translate(0,12px);opacity:.15}50%{transform:translate(12px,-18px);opacity:.75}}
+@keyframes neon-orbit{from{transform:rotate(-22deg)}to{transform:rotate(338deg)}}
+@keyframes neon-robot{from{filter:drop-shadow(0 0 4px #7af5ff44) drop-shadow(0 0 12px #ae66ff33)}to{filter:drop-shadow(0 0 7px #7af5ff66) drop-shadow(0 0 20px #ae66ff55)}}
+@media(max-width:700px){.neon-halo{left:32%;top:8%;width:60%;height:76%}.neon-field i:nth-child(n+11){display:none}.ai-banner{box-shadow:0 0 24px #7c4aff1a}.pointer-light{display:none}}
+@media(prefers-reduced-motion:reduce){body:not(.motion-forced) .neon-halo i,body:not(.motion-forced) .neon-aurora,body:not(.motion-forced) .neon-field i,body:not(.motion-forced) .robot img,body:not(.motion-forced) .ai-banner::before{animation:none!important}}

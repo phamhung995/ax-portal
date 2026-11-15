@@ -35,7 +35,7 @@ function sanitizeNode(node: Node): void {
       sanitizeNode(el)
       // capture needed values BEFORE stripping, then re-apply safe ones
       const attrs: Record<string, string> = {}
-      for (const a of ['href', 'src', 'alt', 'width', 'height', 'type', 'data-type', 'data-checked', 'colspan', 'rowspan', 'style']) {
+      for (const a of ['href', 'src', 'alt', 'width', 'height', 'type', 'data-type', 'data-checked', 'data-user-id', 'data-user-name', 'colspan', 'rowspan', 'style']) {
         const v = el.getAttribute(a)
         if (v != null) attrs[a] = v
       }
@@ -71,6 +71,17 @@ function sanitizeNode(node: Node): void {
         }
       } else if (tag === 'LABEL') {
         // task list label: keep as-is (no attributes needed)
+      } else if (tag === 'SPAN') {
+        // mention span: keep data-type/data-user-id/data-user-name;
+        // any other span keeps its element but loses all attributes (as before)
+        if (attrs['data-type'] === 'mention') {
+          el.setAttribute('data-type', 'mention')
+          el.setAttribute('class', 'mention')
+          const uid = attrs['data-user-id'] ?? ''
+          if (/^\d+$/.test(uid)) el.setAttribute('data-user-id', uid)
+          const uname = attrs['data-user-name'] ?? ''
+          if (uname) el.setAttribute('data-user-name', uname)
+        }
       } else if (tag === 'LI') {
         // task items: keep data-type + data-checked so checked state renders correctly
         if (attrs['data-type'] === 'taskItem') {

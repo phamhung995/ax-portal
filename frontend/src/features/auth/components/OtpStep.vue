@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismOtpInput from '@/design-system/components/PrismOtpInput.vue'
+import { useI18nStore } from '@/stores/i18n'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -10,9 +11,12 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   /** Epoch ms when the OTP was issued; countdown = 5 minutes from this. */
   issuedAt: { type: Number, default: 0 },
-  verifyLabel: { type: String, default: 'Verify' },
+  verifyLabel: { type: String, default: 'app.auth.otpVerify' },
 })
 const emit = defineEmits(['update:modelValue', 'verify', 'resend'])
+
+const i18n = useI18nStore()
+const { t } = i18n
 
 const EXPIRY_MS = 5 * 60 * 1000
 const now = ref(Date.now())
@@ -58,22 +62,22 @@ onBeforeUnmount(stopTimer)
     <PrismOtpInput
       :model-value="modelValue"
       :state="expired ? 'expired' : otpState"
-      :error="expired ? 'The code has expired. Please request a new one.' : otpError"
+      :error="expired ? t('app.auth.otpExpired') : otpError"
       :disabled="loading || expired"
-      label="OTP"
+      :label="t('app.auth.otpLabel')"
       @update:model-value="emit('update:modelValue', $event)"
     />
 
     <p class="otp-timer" :class="{ 'is-expired': expired }" role="timer">
-      {{ expired ? 'Code expired' : `Code expires in ${countdown}` }}
+      {{ expired ? t('app.auth.otpCodeExpired') : t('app.auth.otpExpiresIn', { countdown }) }}
     </p>
 
     <div class="otp-actions">
       <PrismButton type="button" :loading="loading" :disabled="expired" @click="emit('verify')">
-        {{ verifyLabel }}
+        {{ t(verifyLabel) }}
       </PrismButton>
       <PrismButton variant="secondary" type="button" :disabled="loading" @click="emit('resend')">
-        Resend OTP
+        {{ t('app.auth.otpResend') }}
       </PrismButton>
     </div>
   </div>

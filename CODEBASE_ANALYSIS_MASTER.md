@@ -351,7 +351,7 @@ skill-management/
 │   ├── pom.xml                               # Maven dependencies
 │   ├── mvnw / mvnw.cmd                       # Maven wrapper cross-platform
 │   └── src/
-│       ├── main/java/com/skillmanagement/
+│       ├── main/java/com/furelise/skillmanagement/
 │       │   ├── SkillManagementApplication.java   # Entry point, @SpringBootApplication, @EnableScheduling
 │       │   ├── config/                            # Spring config, security, CORS, seeder
 │       │   │   ├── ApplicationConfig.java         # UserDetailsService, PasswordEncoder, AuthProvider, AuthManager
@@ -436,7 +436,7 @@ skill-management/
 ## 5. Kiến trúc Backend
 
 ### 5.1 Application Entry Points
-- **Main class:** `backend/src/main/java/com/skillmanagement`
+- **Main class:** `backend/src/main/java/com/furelise/skillmanagement/SkillManagementApplication.java`
 - Annotations: `@SpringBootApplication`, `@EnableScheduling`
 - Virtual threads enabled via `spring.threads.virtual.enabled: true` (`application.yml`)
 - Data seeding on startup via `DataSeeder.java` (`CommandLineRunner`):
@@ -446,7 +446,7 @@ skill-management/
 ### 5.2 Package / Module Architecture
 
 ```
-com.skillmanagement
+com.furelise.skillmanagement
 ├── config/                     # Infrastructure configuration
 │   ├── ApplicationConfig       # UserDetailsService, PasswordEncoder, AuthProvider, AuthManager
 │   ├── SecurityConfig          # SecurityFilterChain (CSRF disabled, stateless sessions)

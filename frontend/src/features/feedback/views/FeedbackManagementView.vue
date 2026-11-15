@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismCombobox from '@/design-system/components/PrismCombobox.vue'
 import PrismInput from '@/design-system/components/PrismInput.vue'
@@ -17,18 +18,21 @@ import SearchUserPopup from '@/features/skills/views/SearchUserPopup.vue'
 import type { FeedbackItem, FeedbackStatus, FeedbackType } from '@/features/feedback/types'
 import type { SearchUserItem } from '@/features/skills/types'
 import type { UserListItem } from '@/features/users/types'
+import { useI18nStore } from '@/stores/i18n'
 
-const TYPE_OPTIONS = [
-  { label: 'Bug', value: 'BUG' },
-  { label: 'Suggestion', value: 'SUGGESTION' },
-  { label: 'Question', value: 'QUESTION' },
-]
-const STATUS_OPTIONS = [
-  { label: 'New', value: 'NEW' },
-  { label: 'In Review', value: 'IN_REVIEW' },
-  { label: 'Resolved', value: 'RESOLVED' },
-  { label: 'Ignored', value: 'IGNORED' },
-]
+const { t, formatDateTime } = useI18nStore()
+
+const TYPE_OPTIONS = computed(() => [
+  { label: '🐞 ' + t('app.feedback.typeBug'), value: 'BUG' },
+  { label: '💡 ' + t('app.feedback.typeSuggestion'), value: 'SUGGESTION' },
+  { label: '❓ ' + t('app.feedback.typeQuestion'), value: 'QUESTION' },
+])
+const STATUS_OPTIONS = computed(() => [
+  { label: t('app.feedback.statusNew'), value: 'NEW' },
+  { label: t('app.feedback.statusInReview'), value: 'IN_REVIEW' },
+  { label: t('app.feedback.statusResolved'), value: 'RESOLVED' },
+  { label: t('app.feedback.statusIgnored'), value: 'IGNORED' },
+])
 const PAGE_SIZES = [10, 20, 50, 100]
 
 const s = ref({
@@ -71,22 +75,13 @@ const handlerOptions = computed(() =>
 )
 
 const typeLabel = (code: string) =>
-  code === 'BUG' ? '🐞 Bug' : code === 'SUGGESTION' ? '💡 Suggestion' : code === 'QUESTION' ? '❓ Question' : code
+  code === 'BUG' ? '🐞 ' + t('app.feedback.typeBug') : code === 'SUGGESTION' ? '💡 ' + t('app.feedback.typeSuggestion') : code === 'QUESTION' ? '❓ ' + t('app.feedback.typeQuestion') : code
 const typeTone = (code: string) =>
   code === 'BUG' ? 'danger' : code === 'SUGGESTION' ? 'info' : 'neutral'
 const statusLabel = (code: string) =>
-  code === 'NEW' ? 'New' : code === 'IN_REVIEW' ? 'In Review' : code === 'RESOLVED' ? 'Resolved' : code === 'IGNORED' ? 'Ignored' : code
+  code === 'NEW' ? t('app.feedback.statusNew') : code === 'IN_REVIEW' ? t('app.feedback.statusInReview') : code === 'RESOLVED' ? t('app.feedback.statusResolved') : code === 'IGNORED' ? t('app.feedback.statusIgnored') : code
 const statusTone = (code: string) =>
   code === 'NEW' ? 'warning' : code === 'IN_REVIEW' ? 'info' : code === 'RESOLVED' ? 'success' : 'neutral'
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`
-}
 
 async function runSearch(resetPage = true) {
   if (resetPage) s.value.page = 1
@@ -145,7 +140,7 @@ function onPageSize(size: number) {
 // ── Export ──────────────────────────────────────────────────────────────────
 async function onExport() {
   if (!s.value.items.length) {
-    toastError('No data to export. Run a search first.')
+    toastError(t('app.common.noDataToExport'))
     return
   }
   try {
@@ -156,19 +151,19 @@ async function onExport() {
       requesterId: s.value.requesterId ?? undefined,
       resolvedById: s.value.resolvedById ? Number(s.value.resolvedById) : undefined,
     })
-    toastSuccess('Feedback list exported successfully.')
+    toastSuccess(t('app.feedback.exportedToast'))
   } catch (err) {
     toastError(toUserError(err).message)
   }
 }
 
 const columns = computed(() => [
-  { key: 'type', label: 'Type' },
-  { key: 'content', label: 'Content' },
-  { key: 'user', label: 'Requester' },
-  { key: 'resolvedByName', label: 'Handler' },
-  { key: 'status', label: 'Status' },
-  { key: 'createdAt', label: 'Created' },
+  { key: 'type', label: t('app.feedback.colType') },
+  { key: 'content', label: t('app.feedback.colContent') },
+  { key: 'user', label: t('app.feedback.colRequester') },
+  { key: 'resolvedByName', label: t('app.feedback.colHandler') },
+  { key: 'status', label: t('app.feedback.colStatus') },
+  { key: 'createdAt', label: t('app.feedback.colCreated') },
 ])
 
 // ── Detail popup ────────────────────────────────────────────────────────────
@@ -184,49 +179,71 @@ function onPopupSaved() {
   if (s.value.hasSearched) runSearch(false)
 }
 
+const route = useRoute()
+
 onMounted(() => {
   loadAdminOptions()
   runSearch(true)
+  // Deep-link from notification emails: ?feedback={id} opens the detail popup.
+  const q = route.query.feedback
+  if (typeof q === 'string' && q !== '') {
+    const id = Number(q)
+    if (Number.isInteger(id) && id > 0) {
+      detailId.value = id
+    }
+  }
 })
+
+// Email deep-link while already on /feedback: re-open the detail popup.
+watch(
+  () => route.query.feedback,
+  (raw) => {
+    if (typeof raw !== 'string' || raw === '') return
+    const id = Number(raw)
+    if (Number.isInteger(id) && id > 0) {
+      detailId.value = id
+    }
+  },
+)
 </script>
 
 <template>
   <div class="fbm">
     <!-- Search area -->
-    <section class="search p-glass" aria-label="Search" @keydown="onSearchKeydown">
+    <section class="search p-glass" :aria-label="t('app.common.searchAria')" @keydown="onSearchKeydown">
       <div class="search-grid">
         <PrismInput
           v-model="s.content"
-          label="Content"
-          placeholder="Search in content..."
+          :label="t('app.feedback.searchContent')"
+          :placeholder="t('app.feedback.searchContentPh')"
         />
         <PrismCombobox
           v-model="s.type"
-          label="Type"
-          placeholder="All Types"
+          :label="t('app.feedback.type')"
+          :placeholder="t('app.feedback.allTypes')"
           clearable
           :options="TYPE_OPTIONS"
         />
         <PrismCombobox
           v-model="s.status"
-          label="Status"
-          placeholder="All Statuses"
+          :label="t('app.common.status')"
+          :placeholder="t('app.common.allStatuses')"
           clearable
           :options="STATUS_OPTIONS"
         />
         <div class="fbm-field">
-          <label class="p-label">Requester</label>
+          <label class="p-label">{{ t('app.feedback.requester') }}</label>
           <div class="fbm-creator">
-            <button type="button" class="fbm-creator-search" aria-label="Search requester" @click="searchUserOpen = true">
+            <button type="button" class="fbm-creator-search" :aria-label="t('app.feedback.searchRequesterAria')" @click="searchUserOpen = true">
               <Search :size="16" aria-hidden="true" />
             </button>
             <span v-if="s.requesterName" class="fbm-creator-name">{{ s.requesterName }}</span>
-            <span v-else class="fbm-creator-placeholder">Select requester</span>
+            <span v-else class="fbm-creator-placeholder">{{ t('app.feedback.selectRequester') }}</span>
             <button
               v-if="s.requesterId"
               type="button"
               class="fbm-creator-clear"
-              aria-label="Clear requester"
+              :aria-label="t('app.feedback.clearRequesterAria')"
               @click="s.requesterId = null; s.requesterName = ''"
             >
               <X :size="14" aria-hidden="true" />
@@ -235,8 +252,8 @@ onMounted(() => {
         </div>
         <PrismCombobox
           :model-value="s.resolvedById"
-          label="Handler"
-          placeholder="All Handlers"
+          :label="t('app.feedback.handler')"
+          :placeholder="t('app.feedback.allHandlers')"
           clearable
           :options="handlerOptions"
           @update:model-value="s.resolvedById = $event ?? ''"
@@ -244,19 +261,19 @@ onMounted(() => {
       </div>
       <div class="search-actions">
         <PrismButton variant="secondary" type="button" @click="onExport">
-          <Download :size="16" aria-hidden="true" /> Download Excel
+          <Download :size="16" aria-hidden="true" /> {{ t('app.feedback.exportBtn') }}
         </PrismButton>
         <span class="search-actions-spacer" aria-hidden="true"></span>
-        <PrismButton type="button" :loading="s.loading" @click="onSearch">Search</PrismButton>
-        <PrismButton variant="secondary" type="button" @click="onReset">Reset</PrismButton>
+        <PrismButton type="button" :loading="s.loading" @click="onSearch">{{ t('app.common.search') }}</PrismButton>
+        <PrismButton variant="secondary" type="button" @click="onReset">{{ t('app.common.reset') }}</PrismButton>
       </div>
     </section>
 
     <!-- Grid -->
-    <section class="grid p-glass" aria-label="Feedback list">
-      <PrismEmptyState v-if="s.error" title="Unable to load feedback list.">
+    <section class="grid p-glass" :aria-label="t('app.feedback.listAria')">
+      <PrismEmptyState v-if="s.error" :title="t('app.feedback.loadError')">
         <p class="grid-error-text">{{ s.error }}</p>
-        <PrismButton variant="secondary" @click="onSearch">Retry</PrismButton>
+        <PrismButton variant="secondary" @click="onSearch">{{ t('app.common.retry') }}</PrismButton>
       </PrismEmptyState>
       <template v-else>
         <PrismTable
@@ -264,8 +281,8 @@ onMounted(() => {
           :rows="s.items"
           row-key="id"
           :loading="s.loading"
-          caption="Feedback list"
-          empty-text="No feedback found."
+          :caption="t('app.common.total', { n: s.totalCount })"
+          :empty-text="t('app.feedback.empty')"
         >
           <template #cell-type="{ row }">
             <PrismBadge :tone="typeTone((row as FeedbackItem).type)">
@@ -281,7 +298,7 @@ onMounted(() => {
               <span class="fbm-content-text" :title="stripHtml((row as FeedbackItem).content)">
                 {{ stripHtml((row as FeedbackItem).content) }}
               </span>
-              <span v-if="(row as FeedbackItem).hasScreenshot" class="fbm-shot-icon" title="Has screenshot">📷</span>
+              <span v-if="(row as FeedbackItem).hasScreenshot" class="fbm-shot-icon" :title="t('app.feedback.hasScreenshot')">📷</span>
             </button>
           </template>
           <template #cell-user="{ row }">
@@ -304,12 +321,16 @@ onMounted(() => {
         </PrismTable>
 
         <div class="fbm-pager">
-          <label class="fbm-pagesize">
-            Rows
-            <select :value="s.pageSize" @change="onPageSize(Number(($event.target as HTMLSelectElement).value))">
-              <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
-            </select>
-          </label>
+          <div class="fbm-pagesize">
+            <span class="fbm-pagesize-label">{{ t('app.common.rows') }}</span>
+            <PrismCombobox
+              :model-value="s.pageSize"
+              readonly
+              :aria-label="t('app.common.rowsPerPage')"
+              :options="PAGE_SIZES.map((size) => ({ value: size, label: String(size) }))"
+              @update:model-value="onPageSize(Number($event))"
+            />
+          </div>
           <PrismPagination
             :page="s.page"
             :page-size="s.pageSize"
@@ -335,14 +356,14 @@ onMounted(() => {
 }
 
 .search {
-  padding: var(--ds-space-5);
+  padding: var(--ds-space-4);
   display: grid;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 .search-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 @media (max-width: 1399px) {
   .search-grid {
@@ -371,17 +392,37 @@ onMounted(() => {
 }
 .fbm-field {
   display: grid;
-  gap: var(--ds-space-2);
+  gap: var(--ds-space-1);
+  font-size: 13px;
+  min-width: 0;
+  align-content: start;
 }
 .fbm-creator {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  padding: 8px 10px;
+  padding: 0 10px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
+  /* 36px = 34px input + 2px border, matches .p-input-wrap in compact mode */
+  min-height: 36px;
+  box-sizing: border-box;
+  font-size: 13px;
   background: var(--ds-input-background);
   color: var(--ds-color-text-primary);
+  cursor: pointer;
+  transition: border-color var(--ds-duration-fast), background var(--ds-duration-fast), box-shadow var(--ds-duration-fast);
+}
+@media (hover: hover) {
+  .fbm-creator:hover {
+    border-color: var(--ds-color-border-strong);
+    background: var(--ds-input-hover-background);
+  }
+}
+.fbm-creator:focus-within {
+  border-color: var(--ds-color-accent);
+  background: var(--ds-input-focus-background);
+  box-shadow: 0 0 0 3px rgb(103 232 249 / .10), 0 0 14px rgb(103 232 249 / .05);
 }
 .fbm-creator-placeholder {
   color: var(--ds-color-text-secondary);
@@ -455,18 +496,34 @@ onMounted(() => {
   margin-top: var(--ds-space-4);
   flex-wrap: wrap;
 }
+/* Rows (page size) — compact: label + 30px combobox, narrow width. */
 .fbm-pagesize {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: 13px;
+  flex-shrink: 0;
+}
+.fbm-pagesize-label {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ds-color-text-secondary);
 }
-.fbm-pagesize select {
-  background: var(--ds-input-background);
-  border: 1px solid var(--ds-color-border);
-  color: var(--ds-color-text-primary);
-  border-radius: var(--ds-radius-sm);
-  padding: 6px 8px;
+/* The combobox has no label of its own — PrismFormField still renders an
+   empty <label> row; hide it so the control sits on the same line as "Rows". */
+.fbm-pagesize :deep(.p-field) {
+  gap: 0;
+}
+.fbm-pagesize :deep(.p-field > label:empty) {
+  display: none;
+}
+.fbm-pagesize :deep(.p-combobox) {
+  width: 84px;
+  font-size: 12px;
+}
+.fbm-pagesize :deep(.p-input-wrap),
+.fbm-pagesize :deep(.p-input-wrap) input {
+  min-height: 30px;
+  font-size: 12px;
+  padding: 0 var(--ds-space-2);
 }
 </style>

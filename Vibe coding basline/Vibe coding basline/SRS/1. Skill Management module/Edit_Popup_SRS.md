@@ -71,7 +71,8 @@ Edit Skill Popup là cửa sổ hiện lên khi người dùng click nút "Edit"
 | Phạm vi hiển thị | ✏️ Edit | ✏️ Edit | ✏️ Edit | ❌ Không mở popup | ❌ Không mở popup |
 | Mô tả | ✏️ Edit | ✏️ Edit | ✏️ Edit | ❌ Không mở popup | ❌ Không mở popup |
 | Hashtag | ✏️ Edit | ✏️ Edit | ✏️ Edit | ❌ Không mở popup | ❌ Không mở popup |
-| File | ✏️ Edit | ✏️ Edit | ✏️ Edit | ❌ Không mở popup | ❌ Không mở popup |
+| File | ✏️ Edit | ✏️ Edit | 👁️ Read-only (hint: chỉ quản lý qua Update Version) | ❌ Không mở popup | ❌ Không mở popup |
+| MCP Dependencies | ✏️ Edit | ✏️ Edit | 👁️ Read-only (hint: chỉ quản lý qua Update Version — 2026-11-06) | ❌ Không mở popup | ❌ Không mở popup |
 
 ---
 

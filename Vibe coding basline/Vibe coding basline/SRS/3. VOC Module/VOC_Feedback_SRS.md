@@ -10,7 +10,7 @@
 | **Ngày tạo** | 16/10/2026 |
 | **Tác giả** | BA Team |
 | **Trạng thái** | Baseline (đã implement) |
-| **Module code** | Backend: `com.skillmanagement.feedback` · Frontend: `src/features/feedback/` |
+| **Module code** | Backend: `com.furelise.skillmanagement.feedback` · Frontend: `src/features/feedback/` |
 
 ---
 

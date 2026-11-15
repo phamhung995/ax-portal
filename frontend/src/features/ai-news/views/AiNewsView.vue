@@ -1,22 +1,33 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Calendar, Heart, Mail, MessageCircle, Send, ThumbsUp, Trash2 } from 'lucide-vue-next'
+import { Calendar, ChevronDown, ChevronLeft, ChevronUp, Eye, Heart, Mail, MessageCircle, Search, Upload } from 'lucide-vue-next'
 import PrismAlert from '@/design-system/components/PrismAlert.vue'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismCard from '@/design-system/components/PrismCard.vue'
+import PrismDatePicker from '@/design-system/components/PrismDatePicker.vue'
+import PrismDrawer from '@/design-system/components/PrismDrawer.vue'
 import PrismEmptyState from '@/design-system/components/PrismEmptyState.vue'
+import PrismInput from '@/design-system/components/PrismInput.vue'
 import PrismSkeleton from '@/design-system/components/PrismSkeleton.vue'
-import { aiNewsApi } from '@/features/ai-news/api'
-import { formatDate, loadAiNewsPrefs, t } from '@/features/ai-news/i18n'
+import AiNewsComments from '@/features/ai-news/components/AiNewsComments.vue'
+import AiNewsImportDialog from '@/features/ai-news/components/AiNewsImportDialog.vue'
+import { aiNewsApi, type AiNewsSearchFilters } from '@/features/ai-news/api'
+import { useAiNewsComments } from '@/features/ai-news/composables/useAiNewsComments'
 import { toUserError } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/stores/auth'
-import type { AiNewsCommentItem, AiNewsDetail, AiNewsItem } from '@/features/ai-news/types'
+import { useI18nStore } from '@/stores/i18n'
+import type { AiNewsDetail, AiNewsItem } from '@/features/ai-news/types'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const i18n = useI18nStore()
+const { t, formatDate } = i18n
+
+// ── Manual .mht import (admin only — FR-21) ────────────────────────────────
+const importOpen = ref(false)
 
 // ── List pane ───────────────────────────────────────────────────────────────
 const listLoading = ref(true)
@@ -24,37 +35,140 @@ const listError = ref('')
 const items = ref<AiNewsItem[]>([])
 const selectedId = ref<number | null>(null)
 
+// ── Advanced search box (collapsible) ───────────────────────────────────────
+// Draft = what the user is typing; applied = what the last Search/Reset sent
+// to the API. Closing the box keeps the applied filters (results persist).
+const searchOpen = ref(false)
+const searched = ref(false)
+const draft = ref<AiNewsSearchFilters>({})
+const applied = ref<AiNewsSearchFilters>({})
+
+const activeFilterCount = computed(() => {
+  const f = applied.value
+  let n = 0
+  if (f.title?.trim()) n++
+  if (f.sender?.trim()) n++
+  if (f.from) n++
+  if (f.to) n++
+  return n
+})
+
+function toggleSearch() {
+  searchOpen.value = !searchOpen.value
+}
+
+function runSearch() {
+  const f: AiNewsSearchFilters = {
+    title: draft.value.title?.trim() || undefined,
+    sender: draft.value.sender?.trim() || undefined,
+    from: draft.value.from || undefined,
+    to: draft.value.to || undefined,
+  }
+  if (f.from && f.to && f.from > f.to) {
+    toast({ title: t('aiNews.invalidDateRange'), tone: 'warning' })
+    return
+  }
+  applied.value = f
+  searched.value = true
+  loadList()
+}
+
+function resetSearch() {
+  draft.value = {}
+  applied.value = {}
+  searched.value = false
+  loadList()
+}
+
 const DOT_TONES = ['accent', 'violet', 'success', 'warning', 'teal', 'rose']
+
+// Grid sort mode (newest / most liked / most commented). Applied client-side
+// on the already-fetched items — no extra API call needed.
+const gridSort = ref<'newest' | 'likes' | 'comments'>('newest')
+const gridSortMenuOpen = ref(false)
+const gridSortedItems = computed(() => {
+  const arr = [...items.value]
+  if (gridSort.value === 'likes') {
+    arr.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || (b.newsId - a.newsId))
+  } else if (gridSort.value === 'comments') {
+    arr.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0) || (b.newsId - a.newsId))
+  } else {
+    // 'newest' — sort by createdAt DESC (parse to epoch ms — lexicographic
+    // ISO comparison is unreliable with variable fractional-second precision).
+    arr.sort((a, b) => {
+      const ta = new Date(a.createdAt).getTime()
+      const tb = new Date(b.createdAt).getTime()
+      return ta === tb ? b.newsId - a.newsId : tb - ta
+    })
+  }
+  return arr
+})
+
+// Monotonic counter to discard stale list responses when the user re-triggers
+// a search while a fetch is in flight (out-of-order responses).
+let listReqId = 0
 
 async function loadList() {
   listLoading.value = true
   listError.value = ''
+  const reqId = ++listReqId
   try {
-    items.value = await aiNewsApi.list(50)
-    // FR-03: ?news={newsId} → select it (if in list); otherwise the newest.
+    const data = await aiNewsApi.list(50, applied.value)
+    if (reqId !== listReqId) return // superseded by a newer search
+    items.value = data
+    // FR-03: ?news={newsId} → select it (if in list); otherwise the first
+    // item in the ACTIVE grid sort order (not raw API order).
     const queryId = Number(route.query.news)
     const wanted = Number.isFinite(queryId) && queryId > 0 ? queryId : null
     const exists = wanted != null && items.value.some((n) => n.newsId === wanted)
-    selectedId.value = exists ? wanted : (items.value[0]?.newsId ?? null)
+    // Compute the first visible item respecting the current grid sort.
+    const sorted = [...data]
+    if (gridSort.value === 'likes') {
+      sorted.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || b.newsId - a.newsId)
+    } else if (gridSort.value === 'comments') {
+      sorted.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0) || b.newsId - a.newsId)
+    }
+    selectedId.value = exists ? wanted : (sorted[0]?.newsId ?? null)
     syncHash()
   } catch (error) {
+    if (reqId !== listReqId) return
     listError.value = toUserError(error).message
   } finally {
-    listLoading.value = false
+    if (reqId === listReqId) listLoading.value = false
   }
 }
 
 function syncHash() {
   if (selectedId.value == null) return
-  const target = `/ai-news?news=${selectedId.value}`
-  if (route.fullPath !== target) {
-    router.replace({ path: '/ai-news', query: { news: String(selectedId.value) } })
-  }
+  // A stale list response resolving after the user navigated away must not
+  // yank them back to /ai-news (the component is unmounted — only the
+  // router survives).
+  if (route.path !== '/ai-news') return
+  // Only preserve ?comment when it belongs to the CURRENT item — a stale
+  // comment from a different news item must not linger in the URL.
+  const comment =
+    typeof route.query.comment === 'string' && route.query.news === String(selectedId.value)
+      ? route.query.comment : undefined
+  const news = String(selectedId.value)
+  if (route.query.news === news && (route.query.comment ?? undefined) === comment) return
+  router.replace({
+    path: '/ai-news',
+    query: { news, ...(comment ? { comment } : {}) },
+  })
 }
 
 function selectItem(newsId: number) {
   if (newsId === selectedId.value) return
   selectedId.value = newsId
+  // A stale ?comment from a PREVIOUS news item must not survive an item
+  // switch — BUT a fresh ?comment arriving WITH this news (bell deep-link
+  // to a different item) must be kept so scrollToPendingComment can fire.
+  // Only strip when the URL's news param doesn't match the target.
+  if (typeof route.query.comment === 'string' && route.query.news !== String(newsId)) {
+    const query: Record<string, string> = { news: String(newsId) }
+    router.replace({ path: '/ai-news', query })
+    return
+  }
   syncHash()
 }
 
@@ -94,11 +208,16 @@ async function loadDetail() {
   detailState.value = 'loading'
   detail.value = null
   try {
-    const data = await aiNewsApi.detail(id, controller.signal)
+    // Fire detail + comments in parallel — they are independent endpoints
+    // (comments does its own requireActiveNews). Saves one RTT on every
+    // item selection.
+    const [data] = await Promise.all([
+      aiNewsApi.detail(id, controller.signal),
+      loadComments(),
+    ])
     if (controller.signal.aborted) return
     detail.value = data
     detailState.value = data.body ? 'ok' : 'empty'
-    loadComments()
   } catch (error) {
     if (controller.signal.aborted) return
     const code = (error as { code?: string })?.code
@@ -107,6 +226,92 @@ async function loadDetail() {
     if (!controller.signal.aborted) detailLoading.value = false
   }
 }
+
+// ── View tracking (stay on the detail 30s → record the view) ────────────────
+// The backend is idempotent per (news, user), so a re-fire after a page
+// reload is a no-op — the Set below only avoids redundant calls within a
+// single page session. The 30s only accumulates while the tab is VISIBLE —
+// a background tab must not count as "reading" (true pause: hidden time is
+// subtracted out, so a user who reads 10s, switches tabs for 10 minutes,
+// and comes back still needs 20s of VISIBLE reading).
+const VIEW_TRACK_MS = 30_000
+let viewTimer: number | null = null
+let viewRemaining: number | null = null // ms of visible reading still needed
+let viewTickStart: number | null = null // when the current visible segment started
+const viewedIds = new Set<number>()
+
+function stopViewTimer() {
+  if (viewTimer != null) {
+    window.clearTimeout(viewTimer)
+    viewTimer = null
+  }
+  viewRemaining = null
+  viewTickStart = null
+}
+
+function startViewTimer() {
+  stopViewTimer()
+  const id = selectedId.value
+  if (id == null || viewedIds.has(id)) return
+  viewRemaining = VIEW_TRACK_MS
+  scheduleViewTimer()
+}
+
+function scheduleViewTimer() {
+  if (viewTimer != null) window.clearTimeout(viewTimer)
+  viewTimer = null
+  if (viewRemaining == null) return
+  // Tab hidden → paused; the visibilitychange handler resumes with the
+  // remaining time when the tab comes back.
+  if (document.hidden) return
+  viewTickStart = Date.now()
+  viewTimer = window.setTimeout(() => {
+    viewTimer = null
+    viewTickStart = null
+    viewRemaining = null
+    fireViewRecord()
+  }, viewRemaining)
+}
+
+function fireViewRecord() {
+  const id = selectedId.value
+  if (id == null || viewedIds.has(id)) return
+  viewedIds.add(id)
+  aiNewsApi.recordView(id)
+    .then(({ viewCount }) => {
+      // Only apply if the user is still on the same item.
+      if (selectedId.value === id && detail.value) {
+        detail.value = { ...detail.value, viewCount }
+      }
+    })
+    .catch(() => {
+      /* silent — view tracking must never break the UI */
+    })
+}
+
+// True pause: while the tab is hidden, bank the elapsed visible time so
+// hidden time does NOT count toward the 30s. On return, resume the timer
+// with whatever visible reading is still needed.
+function onViewVisibilityChange() {
+  if (document.hidden) {
+    if (viewTimer != null && viewRemaining != null && viewTickStart != null) {
+      window.clearTimeout(viewTimer)
+      viewTimer = null
+      viewRemaining -= Date.now() - viewTickStart
+      viewTickStart = null
+    }
+  } else {
+    scheduleViewTimer()
+  }
+}
+
+// The timer starts when the detail is actually readable (body ok OR empty
+// body — the user is on the article either way) and resets on every item
+// switch / load failure.
+watch(detailState, (state) => {
+  if (state === 'ok' || state === 'empty') startViewTimer()
+  else stopViewTimer()
+})
 
 // ── Like (FR-15 — silent, no toast) ────────────────────────────────────────
 const likeSending = ref(false)
@@ -121,142 +326,51 @@ async function onLike() {
       detail.value = { ...detail.value, likeCount, liked: !prev.liked }
     }
   } catch {
-    /* silent toggle — keep previous state on failure */
+    // Keep the previous (optimistic) state on failure, but tell the user
+    // the like did not register — a silent failure looks like a no-op.
+    toast({ title: t('aiNews.likeFail'), tone: 'warning' })
   } finally {
     likeSending.value = false
   }
 }
 
-// ── Comments (FR-16..FR-20) ─────────────────────────────────────────────────
-const comments = ref<AiNewsCommentItem[]>([])
-const commentText = ref('')
-const commentSending = ref(false)
-const replyTo = ref<number | null>(null)
-const replyText = ref('')
-const replySending = ref(false)
-const deletingId = ref<number | null>(null)
-
-// Monotonic counter to discard stale comment responses when the user
-// switches news items while a fetch is in flight (race condition guard).
-let commentsReqId = 0
-
-async function loadComments() {
-  const id = selectedId.value
-  if (id == null) return
-  const reqId = ++commentsReqId
-  try {
-    const data = await aiNewsApi.comments(id)
-    if (reqId !== commentsReqId) return // superseded by a newer selection
-    comments.value = data
-  } catch {
-    if (reqId !== commentsReqId) return
-    comments.value = []
-  }
-}
-
-const commentCounterWarn = computed(() => commentText.value.length >= 900)
-
-async function sendComment() {
-  const id = selectedId.value
-  if (id == null || commentSending.value) return
-  if (!commentText.value.trim()) return
-  commentSending.value = true
-  try {
-    await aiNewsApi.addComment(id, commentText.value)
-    commentText.value = ''
-    toast({ title: t('aiNews.commentSent'), tone: 'success' })
-    await loadComments()
-  } catch (error) {
-    toast({ title: toUserError(error).message, tone: 'danger' })
-  } finally {
-    commentSending.value = false
-  }
-}
-
-async function sendReply(parentId: number) {
-  const id = selectedId.value
-  if (id == null || replySending.value) return
-  if (!replyText.value.trim()) return
-  // FR-17: replying to a depth-2 comment is flattened to the thread root by
-  // the backend — the user gets the "flattened" info toast instead of the
-  // normal "reply sent" toast.
-  const parent = comments.value.find((c) => c.commentId === parentId)
-  const willFlatten = parent?.parentId != null
-  replySending.value = true
-  try {
-    await aiNewsApi.addComment(id, replyText.value, parentId)
-    replyText.value = ''
-    replyTo.value = null
-    toast({ title: t(willFlatten ? 'aiNews.replyFlattened' : 'aiNews.replySent'), tone: 'info' })
-    await loadComments()
-  } catch (error) {
-    toast({ title: toUserError(error).message, tone: 'danger' })
-  } finally {
-    replySending.value = false
-  }
-}
-
-const voteSendingIds = ref<Set<number>>(new Set())
-async function onHelpful(comment: AiNewsCommentItem) {
-  const id = selectedId.value
-  if (id == null || voteSendingIds.value.has(comment.commentId)) return
-  if (comment.own) {
-    toast({ title: t('aiNews.cannotVoteOwn'), tone: 'info' })
-    return
-  }
-  voteSendingIds.value = new Set(voteSendingIds.value).add(comment.commentId)
-  try {
-    const { helpfulCount } = await aiNewsApi.toggleHelpful(id, comment.commentId)
-    const wasVoted = comment.voted
-    // Only apply the result if the user is still on the same news item —
-    // otherwise the vote would be applied to a different item's comments.
-    if (selectedId.value === id) {
-      comments.value = comments.value.map((c) =>
-        c.commentId === comment.commentId
-          ? { ...c, helpfulCount, voted: !wasVoted }
-          : c,
-      )
-      toast({ title: t(wasVoted ? 'aiNews.voteRemoved' : 'aiNews.voteRegistered'), tone: 'info' })
-    }
-  } catch (error) {
-    if (selectedId.value === id) {
-      toast({ title: toUserError(error).message, tone: 'danger' })
-    }
-  } finally {
-    const next = new Set(voteSendingIds.value)
-    next.delete(comment.commentId)
-    voteSendingIds.value = next
-  }
-}
-
-async function onDelete(comment: AiNewsCommentItem) {
-  const id = selectedId.value
-  if (id == null) return
-  if (!window.confirm(t('aiNews.delCommentDesc'))) return
-  deletingId.value = comment.commentId
-  try {
-    await aiNewsApi.deleteComment(id, comment.commentId)
-    toast({ title: t('aiNews.commentDeleted'), tone: 'success' })
-    await loadComments()
-  } catch (error) {
-    toast({ title: toUserError(error).message, tone: 'danger' })
-  } finally {
-    deletingId.value = null
-  }
-}
-
-// Threaded structure: top-level list + replies grouped by parent (FR-17).
-const topLevel = computed(() => comments.value.filter((c) => c.parentId === null))
-const repliesOf = (commentId: number) => comments.value.filter((c) => c.parentId === commentId)
-const commentCount = computed(() => comments.value.filter((c) => !c.deleted).length)
+// ── Comments (FR-16..FR-20) — state + mutations in the composable ──────────
+const {
+  comments,
+  commentText,
+  commentSending,
+  commentJustSent,
+  replyTo,
+  replyText,
+  replySending,
+  deletingId,
+  commentSortOrder,
+  commentsDrawerOpen,
+  voteSendingIds,
+  commentCount,
+  loadComments,
+  scrollToPendingComment,
+  sendComment,
+  sendReply,
+  onHelpful,
+  onDelete,
+  reset: resetComments,
+  dispose: disposeComments,
+} = useAiNewsComments(selectedId)
 
 // FR-07: links inside the email body open in a new tab (target=_blank rel=noopener).
 function onBodyLinkClick(event: MouseEvent) {
   const anchor = (event.target as HTMLElement).closest('a')
   if (!anchor) return
-  const href = anchor.getAttribute('href')
-  if (!href || href.startsWith('#') || href.startsWith('javascript:')) return
+  // Normalize: trim + strip control chars (e.g. "java\nscript:" would
+  // otherwise slip past the scheme check below).
+  const href = (anchor.getAttribute('href') ?? '').replace(/[\u0000-\u0020\u007f]/g, '').trim()
+  if (!href || href.startsWith('#')) return
   event.preventDefault()
+  // Defense in depth: block script/other dangerous schemes. The backend
+  // already strips these via the Jsoup sanitizer, but never let a
+  // javascript:/vbscript:/data: href execute from the rendered body.
+  if (/^(javascript|vbscript|data):/i.test(href)) return
   if (href.startsWith('mailto:')) {
     // mailto: links must open the mail client, not a new tab.
     window.location.href = href
@@ -265,14 +379,47 @@ function onBodyLinkClick(event: MouseEvent) {
   window.open(href, '_blank', 'noopener,noreferrer')
 }
 
+// FR-07c: strip <style> blocks from the email body before v-html. The
+// backend (HtmlSanitizer) already strips them at import time, so this is a
+// safety net for legacy rows stored before that fix. The Samsung "cafe
+// note" mail editor embeds a full stylesheet (e.g. `body li, body p {
+// margin: 0 auto }`); once injected via v-html it becomes a GLOBAL
+// stylesheet for the whole app — the `margin: 0 auto` on the comment <li>
+// flex items overrides align-items:stretch, shrinking and centering every
+// comment (and other app elements) on those news items. Layout comes from
+// the preserved inline style attributes, so dropping the blocks does not
+// visibly change the email. (Lazy match — a greedy .*? would backtrack
+// quadratically on a multi-MB body.)
+const bodyHtml = computed(() => (detail.value?.body ?? '').replace(/<style[\s\S]*?<\/style>/gi, ''))
+
+// FR-07b: broken images in the email body are removed — the <img> error
+// event does not bubble, so a capture-phase listener on the body container
+// catches it. The body re-renders per news item (v-html), so re-attach on
+// every detail change.
+const bodyEl = ref<HTMLElement | null>(null)
+watch(
+  () => detailState.value,
+  (state) => {
+    if (state !== 'ok') return
+    // The body div is created by v-else-if — wait for the render.
+    void nextTick(() => {
+      bodyEl.value?.addEventListener('error', onBodyImgError, true)
+    })
+  },
+  { immediate: true },
+)
+function onBodyImgError(event: Event) {
+  const target = event.target
+  if (target instanceof HTMLImageElement) {
+    target.remove()
+  }
+}
+
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 watch(selectedId, () => {
   // Reset comment state so the previous item's comments/reply form never
   // leak into the newly selected item while its data is loading.
-  comments.value = []
-  commentText.value = ''
-  replyTo.value = null
-  replyText.value = ''
+  resetComments()
   loadDetail()
 })
 
@@ -290,32 +437,125 @@ watch(
   },
 )
 
+// Bell deep-link while already on the same news item: re-scroll to the
+// (possibly different) target comment.
+watch(
+  () => route.query.comment,
+  () => {
+    scrollToPendingComment()
+  },
+)
+
 onMounted(async () => {
-  // Prefs load in the background — the list renders with the cached/default
-  // language and re-renders when the server prefs arrive.
-  loadAiNewsPrefs()
+  // Ẩn scrollbar trang (vẫn scroll được) chỉ trong màn AI News
+  document.documentElement.classList.add('ainews-page')
+  // View timer only accumulates while the tab is visible.
+  document.addEventListener('visibilitychange', onViewVisibilityChange)
   await loadList()
   // loadDetail is triggered by the selectedId watcher when loadList sets
   // the initial selection — no explicit call needed (would double-fetch).
 })
 
 onBeforeUnmount(() => {
+  document.documentElement.classList.remove('ainews-page')
+  document.removeEventListener('visibilitychange', onViewVisibilityChange)
   detailAbort?.abort()
+  disposeComments()
+  stopViewTimer()
 })
 </script>
 
 <template>
   <div class="ainews">
-    <!-- Page header (AI_News_Screen_SRS.md §2.5) -->
-    <div class="ainews-page-header">
-      <h1 class="ainews-page-title">📰 {{ t('app.aiNews') }}</h1>
-      <p class="ainews-page-sub">{{ t('aiNews.subtitle') }}</p>
+    <AiNewsImportDialog v-model="importOpen" @imported="loadList" />
+
+    <!-- Advanced search box (collapsible) -->
+    <div class="ainews-search" :class="{ 'is-open': searchOpen }">
+      <button
+        type="button"
+        class="ainews-search-toggle"
+        :aria-expanded="searchOpen"
+        @click="toggleSearch"
+      >
+        <Search :size="15" aria-hidden="true" />
+        <span v-if="!searchOpen">{{ t('aiNews.openAdvanceSearch') }}</span>
+        <span v-else class="ainews-search-toggle-title">{{ t('aiNews.advanceSearch') }}</span>
+        <span v-if="activeFilterCount > 0" class="ainews-search-badge">
+          {{ t('aiNews.filtersActive', { n: activeFilterCount }) }}
+        </span>
+        <ChevronUp v-if="searchOpen" :size="16" aria-hidden="true" class="ainews-search-chevron" />
+        <ChevronDown v-else :size="16" aria-hidden="true" class="ainews-search-chevron" />
+      </button>
+
+      <div v-if="searchOpen" class="ainews-search-body">
+        <div class="ainews-search-row" @keyup.enter="runSearch">
+          <PrismInput
+            v-model="draft.title"
+            :label="t('aiNews.searchTitle')"
+            :placeholder="t('aiNews.searchTitlePh')"
+          />
+          <PrismInput
+            v-model="draft.sender"
+            :label="t('aiNews.searchSender')"
+            :placeholder="t('aiNews.searchSenderPh')"
+          />
+          <PrismDatePicker
+            v-model="draft.from"
+            :label="t('aiNews.searchFrom')"
+            :placeholder="t('app.common.selectDatePh')"
+          />
+          <PrismDatePicker
+            v-model="draft.to"
+            :label="t('aiNews.searchTo')"
+            :placeholder="t('app.common.selectDatePh')"
+          />
+        </div>
+        <div class="ainews-search-actions">
+          <!-- Manual .mht import — admin only (FR-21), far left of the row -->
+          <PrismButton
+            v-if="auth.isAdmin"
+            variant="secondary"
+            class="ainews-import-btn"
+            :disabled="listLoading"
+            @click="importOpen = true"
+          >
+            <Upload :size="15" aria-hidden="true" /> {{ t('aiNews.import') }}
+          </PrismButton>
+          <PrismButton variant="secondary" :disabled="listLoading" @click="resetSearch">
+            {{ t('aiNews.reset') }}
+          </PrismButton>
+          <PrismButton variant="primary" :disabled="listLoading" @click="runSearch">
+            <Search :size="15" aria-hidden="true" /> {{ t('aiNews.search') }}
+          </PrismButton>
+        </div>
+      </div>
     </div>
-    <div class="ainews-grid">
+
+    <div
+      class="ainews-grid"
+      :class="{ 'is-empty-list': !listLoading && !listError && !items.length }"
+    >
       <!-- List pane -->
       <PrismCard class="ainews-list-card">
         <template #header>
-          <h3>📰 {{ t('app.aiNews') }}</h3>
+          <h3><span aria-hidden="true">📰</span> {{ t('app.aiNews') }}</h3>
+          <!-- Grid sort dropdown -->
+          <div v-if="!listLoading && items.length" class="ainews-grid-sort">
+            <button
+              type="button"
+              class="ainews-grid-sort-btn"
+              :aria-expanded="gridSortMenuOpen"
+              @click="gridSortMenuOpen = !gridSortMenuOpen"
+            >
+              <span>{{ gridSort === 'newest' ? t('aiNews.gridSortNewest') : gridSort === 'likes' ? t('aiNews.gridSortLikes') : t('aiNews.gridSortComments') }}</span>
+              <ChevronDown :size="13" aria-hidden="true" />
+            </button>
+            <div v-if="gridSortMenuOpen" class="ainews-grid-sort-menu" @click.away="gridSortMenuOpen = false">
+              <button type="button" :class="{ 'is-active': gridSort === 'newest' }" @click="gridSort = 'newest'; gridSortMenuOpen = false">{{ t('aiNews.gridSortNewest') }}</button>
+              <button type="button" :class="{ 'is-active': gridSort === 'likes' }" @click="gridSort = 'likes'; gridSortMenuOpen = false">{{ t('aiNews.gridSortLikes') }}</button>
+              <button type="button" :class="{ 'is-active': gridSort === 'comments' }" @click="gridSort = 'comments'; gridSortMenuOpen = false">{{ t('aiNews.gridSortComments') }}</button>
+            </div>
+          </div>
         </template>
         <div v-if="listLoading" class="ai-news-skeleton" aria-busy="true">
           <div v-for="i in 5" :key="i" class="ai-news-skeleton-row">
@@ -331,11 +571,20 @@ onBeforeUnmount(() => {
         </PrismAlert>
         <PrismEmptyState
           v-else-if="!items.length"
-          :title="t('aiNews.listEmpty')"
-        />
-        <ul v-else class="ai-news-list" role="list">
+          :title="searched ? t('aiNews.noResults') : t('aiNews.listEmpty')"
+          :description="searched ? t('aiNews.noResultsDesc') : undefined"
+        >
+          <PrismButton v-if="searched" variant="secondary" @click="resetSearch">
+            {{ t('aiNews.reset') }}
+          </PrismButton>
+        </PrismEmptyState>
+        <ul
+          v-else
+          class="ai-news-list"
+          role="list"
+        >
           <li
-            v-for="(item, idx) in items"
+            v-for="(item, idx) in gridSortedItems"
             :key="item.newsId"
             class="ai-news-item"
             :class="[`ai-news--${DOT_TONES[idx % DOT_TONES.length]}`, { selected: item.newsId === selectedId }]"
@@ -352,6 +601,11 @@ onBeforeUnmount(() => {
               <p class="ai-news-desc">
                 {{ item.sender ?? item.source }} · {{ formatDate(item.createdAt) }}
               </p>
+              <div v-if="item.likeCount > 0 || item.commentCount > 0 || item.viewCount > 0" class="ai-news-stats">
+                <span v-if="item.likeCount > 0" class="ai-news-stat"><Heart :size="11" aria-hidden="true" /> {{ item.likeCount }}</span>
+                <span v-if="item.commentCount > 0" class="ai-news-stat"><MessageCircle :size="11" aria-hidden="true" /> {{ item.commentCount }}</span>
+                <span v-if="item.viewCount > 0" class="ai-news-stat"><Eye :size="11" aria-hidden="true" /> {{ item.viewCount }}</span>
+              </div>
             </div>
           </li>
         </ul>
@@ -363,7 +617,32 @@ onBeforeUnmount(() => {
           <h3 class="ainews-detail-title" :title="headerTitle">
             {{ headerTitle || t('aiNews.selectNews') }}
           </h3>
+          <!-- FR-22: open the comment sidebar (right drawer) -->
+          <button
+            type="button"
+            class="ainews-open-comments"
+            :aria-label="t('aiNews.openComments')"
+            :disabled="selectedId == null"
+            @click="commentsDrawerOpen = true"
+          >
+            <ChevronLeft :size="16" aria-hidden="true" />
+            <MessageCircle :size="16" aria-hidden="true" />
+          </button>
         </template>
+        <div v-if="headerMeta.sender" class="ainews-meta-row">
+          <span class="ainews-sender">
+            <Mail :size="14" aria-hidden="true" />
+            {{ headerMeta.sender }}
+          </span>
+          <span class="ainews-meta-right">
+            <span v-if="detail && detail.viewCount > 0" class="ainews-viewers" :title="t('aiNews.viewers', { n: detail.viewCount })">
+              <Eye :size="13" aria-hidden="true" />
+              {{ detail.viewCount }}
+            </span>
+            <time class="ainews-date"><Calendar :size="13" aria-hidden="true" />{{ formatDate(headerMeta.createdAt) }}</time>
+          </span>
+        </div>
+        <div class="ainews-detail-scroll">
         <template v-if="selectedId == null">
           <PrismEmptyState
             :title="t('aiNews.selectNews')"
@@ -372,14 +651,6 @@ onBeforeUnmount(() => {
         </template>
 
         <template v-else>
-          <div v-if="headerMeta.sender" class="ainews-meta-row">
-            <span class="ainews-sender">
-              <Mail :size="14" aria-hidden="true" />
-              {{ headerMeta.sender }}
-            </span>
-            <time class="ainews-date"><Calendar :size="13" aria-hidden="true" />{{ formatDate(headerMeta.createdAt) }}</time>
-          </div>
-
           <!-- Body states (FR-08..FR-11) -->
           <div v-if="detailState === 'loading'" class="ainews-body-state">
             <PrismSkeleton height="14px" width="60%" />
@@ -396,168 +667,76 @@ onBeforeUnmount(() => {
           </PrismAlert>
           <div
             v-else-if="detailState === 'ok' && detail"
+            ref="bodyEl"
             class="ainews-body"
-            v-html="detail.body"
+            v-html="bodyHtml"
             @click="onBodyLinkClick"
           ></div>
 
           <!-- Like + comments (FR-15..FR-20) — shown when the detail loaded
                (both body-ok and empty-body states: FR-12 — like/comment are
-               available regardless of body content) -->
-          <template v-if="detail && (detailState === 'ok' || detailState === 'empty')">
-            <!-- Like row (FR-15 — silent) -->
-            <div class="ainews-like-row">
-              <button
-                type="button"
-                class="ainews-like-btn"
-                :class="{ 'is-liked': detail.liked }"
-                :disabled="likeSending"
-                @click="onLike"
-              >
-                <Heart :size="16" :fill="detail.liked ? 'currentColor' : 'none'" aria-hidden="true" />
-                <span>{{ t(detail.liked ? 'aiNews.liked' : 'aiNews.like') }}</span>
-                <span class="ainews-like-count">{{ detail.likeCount }}</span>
-              </button>
-            </div>
-
-            <hr class="ainews-divider" />
-
-            <!-- Comment section (FR-16..FR-20) -->
-            <h3 class="ainews-comments-title">
-              <MessageCircle :size="16" aria-hidden="true" />
-              {{ t('aiNews.commentCount', { n: commentCount }) }}
-            </h3>
-
-            <div class="ainews-comment-form">
-              <label class="ainews-form-label" for="ainews-comment">{{ t('aiNews.writeComment') }}</label>
-              <textarea
-                id="ainews-comment"
-                v-model="commentText"
-                class="p-control ainews-comment-input"
-                rows="3"
-                maxlength="1000"
-                :placeholder="t('aiNews.writeCommentPh')"
-              ></textarea>
-              <small class="ainews-counter" :class="{ 'is-warn': commentCounterWarn }">
-                {{ commentText.length }} / 1000
-              </small>
-              <PrismButton
-                variant="primary"
-                :disabled="!commentText.trim() || commentSending"
-                @click="sendComment"
-              >
-                <Send :size="15" aria-hidden="true" /> {{ t('aiNews.send') }}
-              </PrismButton>
-            </div>
-
-            <div v-if="!topLevel.length" class="ainews-no-comments">
-              <p class="ainews-muted">{{ t('aiNews.noComments') }}</p>
-              <p class="ainews-muted-sm">{{ t('aiNews.noCommentsDesc') }}</p>
-            </div>
-
-            <ul v-else class="ainews-comments" role="list">
-              <li v-for="c in topLevel" :key="c.commentId" class="ainews-comment">
-                <div class="ainews-comment-head">
-                  <span class="ainews-comment-user">
-                    {{ c.deleted ? t('aiNews.deletedUser') : c.userName }}
-                  </span>
-                  <time class="ainews-comment-date">{{ formatDate(c.createdAt) }}</time>
-                  <span class="ainews-comment-actions">
-                    <button
-                      type="button"
-                      class="ainews-vote-btn"
-                      :class="{ 'is-voted': c.voted }"
-                      :disabled="c.own || c.deleted || voteSendingIds.has(c.commentId)"
-                      :aria-label="t('aiNews.helpful')"
-                      @click="onHelpful(c)"
-                    >
-                      <ThumbsUp :size="13" aria-hidden="true" /> {{ t('aiNews.helpful') }} ({{ c.helpfulCount }})
-                    </button>
-                    <button
-                      v-if="!c.deleted"
-                      type="button"
-                      class="ainews-link-btn"
-                      @click="replyTo = replyTo === c.commentId ? null : c.commentId; replyText = ''"
-                    >
-                      {{ t('aiNews.reply') }}
-                    </button>
-                    <button
-                      v-if="!c.deleted && (c.own || auth.isAdmin)"
-                      type="button"
-                      class="ainews-link-btn is-danger"
-                      :disabled="deletingId === c.commentId"
-                      @click="onDelete(c)"
-                    >
-                      <Trash2 :size="12" aria-hidden="true" /> {{ t('aiNews.delComment') }}
-                    </button>
-                  </span>
-                </div>
-                <p v-if="c.deleted" class="ainews-tombstone">{{ t('aiNews.deletedComment') }}</p>
-                <p v-else class="ainews-comment-content">{{ c.content }}</p>
-
-                <!-- Inline reply form (FR-17) -->
-                <div v-if="replyTo === c.commentId && !c.deleted" class="ainews-reply-form">
-                  <textarea
-                    v-model="replyText"
-                    class="p-control ainews-comment-input"
-                    rows="2"
-                    maxlength="1000"
-                    :placeholder="t('aiNews.writeReplyPh')"
-                    @keyup.enter.exact.prevent="sendReply(c.commentId)"
-                  ></textarea>
-                  <PrismButton
-                    variant="secondary"
-                    :disabled="!replyText.trim() || replySending"
-                    @click="sendReply(c.commentId)"
-                  >
-                    {{ t('aiNews.send') }}
-                  </PrismButton>
-                </div>
-
-                <!-- Replies (depth 2, indented, ASC) -->
-                <ul
-                  v-if="repliesOf(c.commentId).length"
-                  class="ainews-replies"
-                  role="list"
-                >
-                  <li v-for="r in repliesOf(c.commentId)" :key="r.commentId" class="ainews-comment is-reply">
-                    <div class="ainews-comment-head">
-                      <span class="ainews-comment-user">
-                        {{ r.deleted ? t('aiNews.deletedUser') : r.userName }}
-                      </span>
-                      <time class="ainews-comment-date">{{ formatDate(r.createdAt) }}</time>
-                      <span class="ainews-comment-actions">
-                        <button
-                          type="button"
-                          class="ainews-vote-btn"
-                          :class="{ 'is-voted': r.voted }"
-                          :disabled="r.own || r.deleted || voteSendingIds.has(r.commentId)"
-                          :aria-label="t('aiNews.helpful')"
-                          @click="onHelpful(r)"
-                        >
-                          <ThumbsUp :size="13" aria-hidden="true" /> {{ t('aiNews.helpful') }} ({{ r.helpfulCount }})
-                        </button>
-                        <button
-                          v-if="!r.deleted && (r.own || auth.isAdmin)"
-                          type="button"
-                          class="ainews-link-btn is-danger"
-                          :disabled="deletingId === r.commentId"
-                          @click="onDelete(r)"
-                        >
-                          <Trash2 :size="12" aria-hidden="true" /> {{ t('aiNews.delComment') }}
-                        </button>
-                      </span>
-                    </div>
-                    <p v-if="r.deleted" class="ainews-tombstone">{{ t('aiNews.deletedComment') }}</p>
-                    <p v-else class="ainews-comment-content">{{ r.content }}</p>
-                  </li>
-                </ul>
-              </li>
-            </ul>
-          </template>
+               available regardless of body content). Shared component, also
+               rendered in the comment sidebar (FR-22). -->
+          <AiNewsComments
+            v-if="detail && (detailState === 'ok' || detailState === 'empty')"
+            v-model:comment-text="commentText"
+            v-model:reply-to="replyTo"
+            v-model:reply-text="replyText"
+            v-model:sort-order="commentSortOrder"
+            :comments="comments"
+            :comment-sending="commentSending"
+            :reply-sending="replySending"
+            :vote-sending-ids="voteSendingIds"
+            :deleting-id="deletingId"
+            :is-admin="auth.isAdmin"
+            :liked="detail.liked"
+            :like-count="detail.likeCount"
+            :like-sending="likeSending"
+            form-position="bottom"
+            :show-header="false"
+            :just-sent="commentJustSent"
+            @send="sendComment"
+            @reply="sendReply"
+            @helpful="onHelpful"
+            @delete="onDelete"
+            @like="onLike"
+          />
         </template>
+        </div>
       </PrismCard>
     </div>
+
+    <!-- FR-22: comment sidebar (right drawer) — shares state with the block
+         under the body, so both stay in sync. -->
+    <PrismDrawer
+      v-model="commentsDrawerOpen"
+      placement="right"
+      dialog-class="ainews-comments-drawer"
+      :title="t('aiNews.commentCount', { n: commentCount })"
+    >
+      <AiNewsComments
+        v-if="commentsDrawerOpen && selectedId != null && detail && (detailState === 'ok' || detailState === 'empty')"
+        v-model:comment-text="commentText"
+        v-model:reply-to="replyTo"
+        v-model:reply-text="replyText"
+        v-model:sort-order="commentSortOrder"
+        :comments="comments"
+        :comment-sending="commentSending"
+        :reply-sending="replySending"
+        :vote-sending-ids="voteSendingIds"
+        :deleting-id="deletingId"
+        :is-admin="auth.isAdmin"
+        :liked="detail.liked"
+        :like-count="detail.likeCount"
+        :like-sending="likeSending"
+        :just-sent="commentJustSent"
+        @send="sendComment"
+        @reply="sendReply"
+        @helpful="onHelpful"
+        @delete="onDelete"
+        @like="onLike"
+      />
+    </PrismDrawer>
   </div>
 </template>
 
@@ -566,71 +745,239 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
+  /* Chiếm trọn vùng màn hình còn lại (trừ app header + padding main) —
+     2 card list/detail bên dưới tự stretch vừa khít màn hình. */
+  height: calc(100svh - var(--nx-app-header-height) - 2 * var(--ds-space-4));
 }
 
-/* Page header (AI_News_Screen_SRS.md §2.5) */
-.ainews-page-header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-.ainews-page-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--ds-color-text-primary);
-}
-.ainews-page-sub {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ds-color-text-muted);
-}
 .ainews-list-error {
   margin: 12px 16px;
 }
 
-/* 2-pane layout (NFR-05) */
+/* ── Advanced search box (collapsible) ───────────────────────────────────── */
+.ainews-search {
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+  background: rgb(9 20 45 / .25);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ainews-search-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--ds-color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.ainews-search-toggle:hover {
+  background: rgb(154 182 219 / .08);
+  color: var(--ds-color-text-primary);
+}
+.ainews-search-toggle > svg:first-child {
+  color: var(--ds-color-accent);
+  flex-shrink: 0;
+}
+.ainews-search-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--ds-color-text-muted);
+}
+.ainews-search-badge {
+  font-size: 11px;
+  color: var(--ds-color-accent);
+  background: rgb(103 232 249 / .1);
+  border: 1px solid rgb(103 232 249 / .25);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.ainews-search-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 14px 14px;
+  border-top: 1px solid rgb(154 182 219 / .1);
+}
+/* Hàng 1: 4 search box chia đều 1 hàng (Title, Sender, From, To) */
+.ainews-search-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+/* Hàng 2: nút Reset/Search — căn phải */
+.ainews-search-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* Nút Import (admin) — ngoài cùng bên trái hàng actions */
+.ainews-import-btn {
+  margin-right: auto;
+}
+@media (max-width: 1199px) {
+  .ainews-search-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 799px) {
+  .ainews-search-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 2-pane layout (NFR-05) — chiếm trọn chiều cao còn lại của .ainews,
+   2 card list/detail stretch vừa khít màn hình (không scroll trang). */
 .ainews-grid {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-rows: 1fr;
   gap: 14px;
-  align-items: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+/* Card list: tự cuộn bên trong khi nhiều item (header card cố định). */
+.ainews-list-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Header card cố định — chỉ phần thân card cuộn */
+.ainews-list-card :deep(> header) {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+.ainews-list-card :deep(> header h3) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Grid sort dropdown */
+.ainews-grid-sort {
+  position: relative;
+  flex-shrink: 0;
+}
+.ainews-grid-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid rgb(154 182 219 / .2);
+  border-radius: 999px;
+  background: none;
+  color: var(--ds-color-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ainews-grid-sort-btn:hover {
+  background: rgb(154 182 219 / .12);
+  color: var(--ds-color-text-primary);
+}
+.ainews-grid-sort-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  min-width: 130px;
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-sm);
+  background: rgb(9 20 45 / .98);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .4);
+}
+.ainews-grid-sort-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ds-color-text-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ainews-grid-sort-menu button:hover {
+  background: rgb(154 182 219 / .12);
+  color: var(--ds-color-text-primary);
+}
+.ainews-grid-sort-menu button.is-active {
+  color: var(--ds-color-accent);
+  font-weight: 600;
+}
+/* Danh sách: tự cuộn trong card khi nhiều item */
+.ai-news-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+/* List rỗng: 2 card cao bằng nhau — detail card stretch theo list card,
+   empty state "Select a news item" căn giữa phần thân card */
+.ainews-grid.is-empty-list {
+  align-items: stretch;
+}
+/* Empty state "Select a news item" căn giữa phần thân card — chỉ dùng flex
+   khi list rỗng (không có body content nên không lo vấn đề flex shrink). */
+.ainews-grid.is-empty-list .ainews-detail-scroll {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.ainews-grid.is-empty-list .ainews-detail-card :deep(.p-empty) {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 @media (max-width: 999px) {
+  .ainews {
+    height: auto;
+  }
   .ainews-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    flex: none;
+  }
+  /* Mobile: 1 cột — list/detail theo chiều cao tự nhiên, scroll ở mức trang */
+  .ai-news-list {
+    overflow: visible;
+  }
+  .ainews-detail-card {
+    height: auto;
+  }
+  .ainews-detail-scroll {
+    overflow: visible;
   }
 }
 
 /* ── List pane — timeline (demo style) ───────────────────────────────────── */
-.ainews-list-card {
-  padding: 0;
-  overflow: hidden;
-}
-.ainews-list-card :deep(header) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgb(154 182 219 / .1);
-}
-.ainews-list-card :deep(h3) {
-  margin: 0;
-  font-size: 15px;
-}
 .ainews-list-card .ai-news-list {
   list-style: none;
   margin: 0;
-  padding: 0 16px;
+  padding: 0;
   display: block;
+}
+.ainews-list-card .ai-news-item {
+  align-items: start;
 }
 .ai-news-item {
   position: relative;
   display: grid;
   grid-template-columns: 18px 1fr;
   gap: var(--ds-space-3);
-  align-items: start;
   padding-bottom: var(--ds-space-5);
   cursor: pointer;
 }
@@ -640,7 +987,7 @@ onBeforeUnmount(() => {
 .ai-news-item::before {
   content: '';
   position: absolute;
-  left: 24px;
+  left: 8px;
   top: 18px;
   bottom: 0;
   width: 2px;
@@ -655,7 +1002,7 @@ onBeforeUnmount(() => {
   height: 6px;
   border-radius: 50%;
   position: absolute;
-  left: 22px;
+  left: 6px;
   top: 6px;
 }
 .ai-news-dot {
@@ -704,6 +1051,20 @@ onBeforeUnmount(() => {
   color: var(--ds-color-text-secondary);
   line-height: 1.5;
 }
+/* Like + comment stats badges on list items */
+.ai-news-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.ai-news-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ds-color-text-muted);
+}
 /* Item đang được chọn (highlight) */
 .ai-news-item.selected .ai-news-title {
   color: var(--ds-color-accent);
@@ -726,6 +1087,67 @@ onBeforeUnmount(() => {
 /* ── Detail pane (demo: PrismCard) ───────────────────────────────────────── */
 .ainews-detail-card {
   min-width: 0;
+  /* Cao vừa khít màn hình (stretch theo grid row). Card là flex column:
+     title + meta-row cố định trên, phần còn lại (.ainews-detail-scroll)
+     tự cuộn bên dưới — body + like + comments cuộn cùng nhau. */
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Title + meta-row (sender/date) cố định — không scroll */
+.ainews-detail-card :deep(> header),
+.ainews-detail-card > .ainews-meta-row {
+  flex-shrink: 0;
+}
+/* FR-22: header card — title + nút mở comment sidebar cùng hàng.
+   Title chiếm chỗ còn lại (ellipsis), nút căn ngoài cùng bên phải. */
+.ainews-detail-card :deep(> header) {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+.ainews-detail-card :deep(> header .ainews-detail-title) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ainews-open-comments {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ds-color-text-secondary);
+  padding: 4px;
+  border-radius: var(--ds-radius-sm);
+  transition: background .15s ease, color .15s ease;
+}
+.ainews-open-comments:hover:not(:disabled) {
+  background: var(--ds-list-item-hover-accent);
+  color: var(--ds-color-text-primary);
+}
+.ainews-open-comments:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+/* Vùng cuộn: body + like + comments (comments nằm ở dưới cùng).
+   KHÔNG dùng flex — để .ainews-body (block) tự mở đầy đủ theo chiều cao
+   nội dung và cả vùng cuộn chung; nếu dùng flex, body (flex child) sẽ bị
+   shrink lại và tự scroll riêng do overflow-x:auto làm overflow-y=auto. */
+.ainews-detail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Smooth scrolling without the jank of JS-animated scrollIntoView.
+     The browser handles it natively on the compositor thread. */
+  scroll-behavior: smooth;
+  /* Contain paint so the heavy email body (v-html) doesn't trigger
+     layout thrashing on the rest of the page during scroll. */
+  contain: layout paint;
+  overscroll-behavior: contain;
 }
 .ainews-detail-title {
   margin: 0;
@@ -745,6 +1167,20 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: var(--ds-color-text-secondary);
   margin-bottom: 10px;
+}
+.ainews-meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.ainews-viewers {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--ds-font-mono);
+  font-size: 12px;
+  color: var(--ds-color-text-muted);
 }
 .ainews-sender {
   display: inline-flex;
@@ -766,43 +1202,37 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-/* Body container (FR-07): slate background, scroll, max-height */
+/* Body container (FR-07): render the email exactly as the imported .mht —
+   keep the email's own text color, background and layout (its inline styles
+   are preserved by the backend sanitizer). Only the container background is
+   set to the .mht's default white page color, and the size is constrained to
+   fit the detail pane. No background/color overrides are forced here.
+   Không giới hạn chiều cao riêng — body mở đầy đủ theo chiều cao nội dung,
+   cuộn chung với detail pane; scroll xuống dưới cùng sẽ thấy comments. */
 .ainews-body {
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-md);
-  background: #64748b; /* slate — email bg-colors forced transparent */
-  color: #fff;
+  background: #fff; /* the .mht's default page background (white) */
+  color: #000;      /* email default text is black; inline styles override */
   font-size: 14px;
   line-height: 1.65;
   padding: 20px 22px;
-  overflow-y: auto;
-  max-height: calc(100svh - 320px);
+  overflow-x: auto;
   word-break: break-word;
 }
-.ainews-body :deep(*) {
-  background-color: transparent !important;
-  /* background-image is NOT stripped — hero banners keep their text */
-}
+/* Fit the email to the pane width WITHOUT altering its own styling: images
+   and tables shrink to the container; the email's inline background-color /
+   color / font are left untouched.
+   `height: auto` OVERRIDES the inline height (e.g. width:900px;height:900px
+   from the Samsung mail editor): max-width alone would still keep the
+   inline height, leaving a huge empty box that pushes the comments away.
+   !important is required to beat the inline style attribute. */
 .ainews-body :deep(img) {
   max-width: 100%;
-  height: auto;
-}
-.ainews-body :deep(a) {
-  color: #ffd54a;
+  height: auto !important;
 }
 .ainews-body :deep(table) {
   max-width: 100%;
-}
-.ainews-body :deep(p) {
-  margin: 0 0 10px;
-}
-.ainews-body :deep(p:last-child) {
-  margin-bottom: 0;
-}
-@media (max-width: 999px) {
-  .ainews-body {
-    max-height: none;
-  }
 }
 
 .ainews-body-state {
@@ -819,202 +1249,61 @@ onBeforeUnmount(() => {
   color: var(--ds-color-text-muted);
   padding: 12px 0;
 }
-.ainews-muted-sm {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--ds-color-text-muted);
-}
 
-/* Like row (FR-15) — borderless, hover bg (demo) */
-.ainews-like-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-}
-.ainews-like-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--ds-color-text-secondary);
-  cursor: pointer;
-  background: none;
-  border: 0;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background .15s ease, color .15s ease;
-}
-.ainews-like-btn:hover {
-  background: rgb(154 182 219 / .12);
-}
-.ainews-like-btn.is-liked {
-  color: var(--ds-color-accent);
-}
-.ainews-like-btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-.ainews-like-count {
-  font-family: var(--ds-font-mono);
-  font-size: 12px;
-}
+/* Like + comments (FR-15..FR-20) styles live in AiNewsComments.vue (shared
+   between the block under the body and the comment sidebar). */
 
-.ainews-divider {
-  border: none;
-  border-top: 1px solid rgb(154 182 219 / .1);
-  margin: var(--ds-space-1) 0;
+/* Ẩn thanh scroll nhưng vẫn scroll được (body, list, detail scroll) */
+.ainews-body,
+.ai-news-list,
+.ainews-detail-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
 }
+.ainews-body::-webkit-scrollbar,
+.ai-news-list::-webkit-scrollbar,
+.ainews-detail-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+</style>
 
-/* Comments (FR-16..FR-20) — boxed items (demo) */
-.ainews-comments-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 14px 0 8px;
-  font-size: 13px;
-  color: var(--ds-color-text-secondary);
+<!-- Non-scoped: PrismDrawer teleport ra body nên scoped style không áp dụng
+     vào <dialog>. Class `ainews-comments-drawer` được forward lên <dialog>
+     (PrismDrawer/PrismDialog nhận prop `class`). -->
+<style>
+/* FR-22: comment sidebar — rộng hơn drawer mặc định (420px → 768px) */
+.ainews-comments-drawer {
+  width: min(768px, calc(100vw - 16px));
 }
-.ainews-comment-form {
+/* Flex column layout ONLY when the dialog is open — without [open],
+   display:flex would override the UA's display:none for closed <dialog>,
+   making the drawer visible even when commentsDrawerOpen is false. */
+.ainews-comments-drawer[open] {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
-  margin-top: 12px;
+  overflow: hidden;
 }
-.ainews-form-label {
-  font-size: 13px;
-  color: var(--ds-color-text-secondary);
+/* Bỏ nhãn "PRISM / DRAWER" trong header của comment sidebar */
+.ainews-comments-drawer .p-eyebrow {
+  display: none;
 }
-.ainews-comment-input {
-  width: 100%;
-  resize: vertical;
+/* Header cố định */
+.ainews-comments-drawer .p-dialog-header {
+  flex-shrink: 0;
 }
-.ainews-counter {
-  font-size: 11px;
-  color: var(--ds-color-text-muted);
-}
-.ainews-counter.is-warn {
-  color: var(--ds-color-rose-300);
-}
-
-.ainews-no-comments {
-  padding: var(--ds-space-3) 0;
-}
-
-.ainews-comments,
-.ainews-replies {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 260px;
+/* Body là scroll container duy nhất — override display:grid → block
+   (grid breaks position:sticky children). */
+.ainews-comments-drawer .p-dialog-body {
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  display: block;
+  scroll-behavior: smooth;
+  contain: layout paint;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
-.ainews-replies {
-  margin-left: 24px;
-  padding-left: 10px;
-  border-left: 2px solid rgb(154 182 219 / .15);
-  gap: 6px;
-  max-height: none;
-  overflow: visible;
-}
-.ainews-comment {
-  padding: 10px 12px;
-  border: 1px solid rgb(154 182 219 / .12);
-  border-radius: var(--ds-radius-sm);
-  background: rgb(9 20 45 / .25);
-}
-.ainews-comment.is-reply {
-  background: rgb(9 20 45 / .15);
-}
-.ainews-comment-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  flex-wrap: wrap;
-}
-.ainews-comment-user {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ds-color-text-primary);
-}
-.ainews-comment-date {
-  font: 11px var(--ds-font-mono);
-  color: var(--ds-color-text-muted);
-}
-.ainews-comment-actions {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.ainews-vote-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 4px;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--ds-color-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-.ainews-vote-btn:hover:not(:disabled) {
-  background: rgb(154 182 219 / .12);
-}
-.ainews-vote-btn.is-voted {
-  color: var(--ds-color-accent);
-}
-.ainews-vote-btn:disabled {
-  opacity: .4;
-  cursor: not-allowed;
-}
-.ainews-link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 4px;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--ds-color-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-.ainews-link-btn:hover {
-  background: rgb(154 182 219 / .12);
-}
-.ainews-link-btn.is-danger:hover {
-  color: var(--ds-color-rose-300);
-}
-.ainews-comment-content {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--ds-color-text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.ainews-tombstone {
-  margin: 6px 0 0;
-  font-size: 13px;
-  font-style: italic;
-  color: var(--ds-color-text-muted);
-}
-.ainews-comment:has(.ainews-tombstone) {
-  opacity: .65;
-  border-style: dashed;
-}
-.ainews-reply-form {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
-  margin-top: var(--ds-space-2);
+.ainews-comments-drawer .p-dialog-body::-webkit-scrollbar {
+  display: none;
 }
 </style>

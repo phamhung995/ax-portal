@@ -8,6 +8,10 @@
   --nx-app-header-height: 56px;
   --nx-app-sidebar-width: 240px;
   --nx-app-sidebar-width-wide: 256px;
+  /* Compact list screens (search panels + their grids) — tighter scale than
+     the design-system defaults. Tune here, not in individual views. */
+  --nx-compact-font-size: 13px;
+  --nx-compact-table-cell-padding: 8px;
 }
 
 html,
@@ -33,6 +37,16 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* Màn AI News: ẩn scrollbar trang (vẫn scroll được) — class được gắn vào
+   <html> khi AiNewsView mount, gỡ khi unmount. */
+html.ainews-page {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+html.ainews-page::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 /* Screen reader only */
@@ -184,4 +198,290 @@ input[type='checkbox']:disabled {
 .rich-content th {
   background: var(--ds-color-bg-secondary, rgba(255, 255, 255, 0.04));
   font-weight: 600;
+}
+
+/* ── Compact search panels (app-level override of design-system sizes) ─────
+   Search areas on list screens (Skill Management, User Management, AI News)
+   use a tighter 34px control height + 13px font so the panel doesn't eat
+   vertical space. Design-system defaults (44px / 16px) are kept everywhere
+   else (forms, popups). */
+.search,
+.ainews-search-body {
+  font-size: 13px;
+}
+.search .p-field,
+.ainews-search-body .p-field {
+  gap: var(--ds-space-1);
+  font-size: 13px;
+}
+.search .p-label,
+.ainews-search-body .p-label {
+  font-size: 13px;
+}
+.search .p-input-wrap,
+.ainews-search-body .p-input-wrap {
+  min-height: 34px;
+  font-size: 13px;
+}
+.search .p-input-wrap input,
+.ainews-search-body .p-input-wrap input {
+  min-height: 34px;
+  font-size: 13px;
+}
+/* Multi-select combobox: keep the chip row at the same 34px height as
+   single-select controls (design default is 44px via --ds-control-height). */
+.search .p-multi-field,
+.ainews-search-body .p-multi-field {
+  min-height: calc(34px - 2px);
+}
+.search .p-multi-field input,
+.ainews-search-body .p-multi-field input {
+  min-height: 34px;
+}
+.search .p-chip,
+.ainews-search-body .p-chip {
+  font-size: 12px;
+}
+.search .p-button,
+.ainews-search-body .p-button {
+  min-height: 34px;
+  padding: 0 var(--ds-space-3);
+  font-size: 13px;
+}
+.search .search-grid,
+.ainews-search-body .ainews-search-row {
+  gap: var(--ds-space-3);
+}
+.search .search-actions,
+.ainews-search-body .ainews-search-actions {
+  gap: var(--ds-space-2);
+}
+/* .p-label is used by custom fields (Tag/Creator/Requester/Cowork/Hashtag/
+   Files) instead of PrismFormField — mirror the PrismFormField label style
+   (16px) so it matches the other form titles. The compact search panel
+   overrides it back to 13px below. */
+.p-label {
+  font-weight: 500;
+  color: var(--ds-color-text-secondary);
+  font-size: 16px;
+}
+/* Combobox dropdown panels opened from a search area are teleported to
+   <body> (tagged .search-combobox-panel by AppShell) — compact them to match
+   the 34px/13px search controls. */
+.search-combobox-panel {
+  font-size: 13px;
+}
+.search-combobox-panel .p-combobox-list {
+  padding: var(--ds-space-1);
+}
+.search-combobox-panel .p-combobox-list li {
+  padding: 5px var(--ds-space-3);
+  font-size: 13px;
+}
+.search-combobox-panel .p-combobox-checkbox {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Compact table (app-level override of design-system .p-table) ───────────
+   List grids next to a compact search panel (.search) opt in with this class
+   so the table matches the panel's scale. Design-system .p-table defaults
+   (15px body / 14px header / 12px cell padding) are kept everywhere else.
+   Usage: <section class="grid table-compact"> */
+.table-compact .p-table {
+  font-size: var(--nx-compact-font-size);
+}
+.table-compact .p-table th {
+  font-size: var(--nx-compact-font-size);
+}
+.table-compact .p-table th,
+.table-compact .p-table td {
+  padding: var(--nx-compact-table-cell-padding);
+}
+
+/* ── Compact pagination (app-level override of design-system sizes) ────────
+   Pagination rows under tables use 13px text + 28px nav buttons so the
+   row doesn't look heavy at the bottom of the list. */
+.p-pagination {
+  font-size: 13px;
+  padding-top: var(--ds-space-2);
+}
+.p-pagination .p-icon-button {
+  width: 28px;
+  min-height: 28px;
+}
+.p-pagination .p-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+.p-pagination [aria-current] {
+  font-weight: 600;
+}
+
+/* ── Wide form dialogs (app-level override of .p-dialog--lg) ───────────────
+   Skill register/edit, AI tool create/edit and MCP register popups use 70%
+   of the viewport instead of the 720px default so the form fields breathe. */
+.skill-form-dialog,
+.ai-tool-form-dialog,
+.mcp-form-dialog,
+.mcp-detail-dialog {
+  width: min(70vw, calc(100vw - 32px));
+}
+
+/* Browse All MCPs popup (FR-MCP-021, v1.28): 7 grid columns need more room
+   than the 720px .p-dialog--lg default (column headers overlapped). */
+.mcp-browse-dialog {
+  width: min(920px, calc(100vw - 32px));
+}
+
+/* ── Compact MCP form dialogs (app-level override of design-system sizes) ──
+   Register new MCP / Edit MCP popups sit on the MCP Management screen, which
+   uses the compact scale (13px font / 34px controls — .search + .table-compact).
+   The design-system form defaults (16px / 44px) made the popup look bigger
+   than the screen behind it, so mirror the search-panel compact overrides. */
+.mcp-form-dialog {
+  font-size: 13px;
+}
+.mcp-form-dialog .p-field {
+  gap: var(--ds-space-1);
+  font-size: 13px;
+}
+.mcp-form-dialog .p-field label {
+  font-size: 13px;
+}
+.mcp-form-dialog .p-input-wrap {
+  min-height: 34px;
+  font-size: 13px;
+}
+.mcp-form-dialog .p-input-wrap input {
+  min-height: 34px;
+  font-size: 13px;
+}
+.mcp-form-dialog .p-multi-field {
+  min-height: calc(34px - 2px);
+}
+.mcp-form-dialog .p-multi-field input {
+  min-height: 34px;
+}
+.mcp-form-dialog .p-chip {
+  font-size: 12px;
+}
+.mcp-form-dialog .p-button {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.mcp-form-dialog .p-radio {
+  min-height: 34px;
+  gap: var(--ds-space-2);
+  font-size: 13px;
+}
+/* MCP Type radio: segmented pill — 2 option gói trong 1 border để rõ là
+   2 lựa chọn của field MCP Type (mảnh, không chiếm diện tích). */
+.mcp-form-dialog .p-radio-group.is-inline {
+  gap: 0;
+  padding: 0 4px;
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-input-background);
+}
+.mcp-form-dialog .p-radio-group.is-inline .p-radio {
+  min-height: 30px;
+  padding: 0 10px;
+}
+.mcp-form-dialog .p-radio-dot {
+  width: 16px;
+  height: 16px;
+}
+.mcp-form-dialog .p-radio-dot::after {
+  width: 7px;
+  height: 7px;
+}
+.mcp-form-dialog .p-field-hint,
+.mcp-form-dialog .p-field-error {
+  font-size: 13px;
+}
+
+/* ── Compact MCP detail dialog (app-level override of design-system sizes) ──
+   MCP Detail popup sits on the MCP Management screen (compact scale) — mirror
+   the same 13px/34px scale as .mcp-form-dialog. Width 70vw stays (v1.16). */
+.mcp-detail-dialog {
+  font-size: 13px;
+}
+.mcp-detail-dialog .p-tablist > button {
+  min-height: 34px;
+  font-size: 13px;
+  padding-bottom: var(--ds-space-2);
+}
+.mcp-detail-dialog .p-alert {
+  padding: var(--ds-space-3);
+  font-size: 13px;
+}
+.mcp-detail-dialog .p-alert > svg {
+  width: 16px;
+  height: 16px;
+}
+.mcp-detail-dialog .p-alert strong {
+  font-size: 13px;
+}
+.mcp-detail-dialog .p-badge {
+  font-size: 12px;
+  padding: 3px 6px;
+}
+.mcp-detail-dialog .p-control {
+  min-height: 34px;
+  font-size: 13px;
+}
+
+/* ── Dialog header (app-level override of design-system defaults) ──────────
+   User request 2026-10-26: drop the "PRISM / DIALOG" eyebrow line and use a
+   smaller title in every dialog. */
+.p-dialog .p-eyebrow {
+  display: none;
+}
+/* Tighten the top gap: the 24px dialog padding-top was sized for the
+   eyebrow line above the title. */
+.p-dialog {
+  padding-top: var(--ds-space-4);
+}
+/* User request 2026-11-01: dialogs sat too close to the viewport edges
+   (16px top/bottom). Give them 40px of breathing room. */
+.p-dialog {
+  max-height: calc(100svh - 80px);
+}
+/* User request 2026-11-01: keep the dialog header and footer (buttons)
+   fixed while only the body scrolls. The design-system dialog scrolls as
+   a whole (overflow: auto on .p-dialog), which drags the footer away.
+   `display: flex` must apply ONLY to :modal — a closed <dialog> relies on
+   the UA's `display: none`, and an unconditional author `display` rule
+   would leave the closed dialog visible behind the page. */
+.p-dialog:modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.p-dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  /* Hide the scrollbar visually but keep scrolling working. */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
+}
+.p-dialog-body::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+/* Smaller buttons in dialogs (44px default is heavy for form footers). */
+.p-dialog .p-button {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+.p-dialog .p-icon-button {
+  min-height: 30px;
+  width: 30px;
+}
+.p-dialog h2 {
+  font-size: 20px;
+  margin-top: 0;
+  margin-bottom: var(--ds-space-2);
 }

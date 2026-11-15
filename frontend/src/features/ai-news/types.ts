@@ -7,6 +7,10 @@ export interface AiNewsItem {
   sender: string | null
   source: string
   createdAt: string
+  likeCount: number
+  commentCount: number
+  /** Distinct-viewer count (users who read this news for 30s+). */
+  viewCount: number
 }
 
 /** Detail — includes the sanitized HTML body. */
@@ -19,6 +23,8 @@ export interface AiNewsDetail {
   createdAt: string
   likeCount: number
   liked: boolean
+  /** Distinct-viewer count (users who read this news for 30s+). */
+  viewCount: number
 }
 
 /** Comment row. deleted = true → tombstone "[deleted]" (FR-19). */
@@ -34,4 +40,22 @@ export interface AiNewsCommentItem {
   deleted: boolean
   own: boolean
   voted: boolean
+}
+
+/** @mention autocomplete candidate (id + display name only). */
+export interface MentionUser {
+  id: number
+  name: string
+}
+
+/**
+ * Per-file result of a manual .mht import (AI_News_Screen_SRS.md v1.14 §5.7).
+ * status: INSERTED | SKIPPED_DUPLICATE | FAILED
+ */
+export interface MhtImportResult {
+  index: number
+  fileName: string
+  status: 'INSERTED' | 'SKIPPED_DUPLICATE' | 'FAILED'
+  newsId: number | null
+  error: string | null
 }

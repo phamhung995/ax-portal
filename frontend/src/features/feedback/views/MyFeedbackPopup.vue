@@ -7,31 +7,24 @@ import { feedbackApi } from '@/features/feedback/api'
 import { toUserError } from '@/lib/api'
 import { toastError } from '@/lib/toast'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { useI18nStore } from '@/stores/i18n'
 import type { FeedbackDetailResponse } from '@/features/feedback/types'
 
 const props = defineProps<{ open: boolean; feedbackId: number | null }>()
 const emit = defineEmits(['update:open'])
+const { t, formatDateTime } = useI18nStore()
 
 const detail = ref<FeedbackDetailResponse | null>(null)
 const loading = ref(false)
 
 const typeLabel = (code: string) =>
-  code === 'BUG' ? '🐞 Bug' : code === 'SUGGESTION' ? '💡 Suggestion' : code === 'QUESTION' ? '❓ Question' : code
+  code === 'BUG' ? '🐞 ' + t('app.feedback.typeBug') : code === 'SUGGESTION' ? '💡 ' + t('app.feedback.typeSuggestion') : code === 'QUESTION' ? '❓ ' + t('app.feedback.typeQuestion') : code
 const typeTone = (code: string) =>
   code === 'BUG' ? 'danger' : code === 'SUGGESTION' ? 'info' : 'neutral'
 const statusLabel = (code: string) =>
-  code === 'NEW' ? 'New' : code === 'IN_REVIEW' ? 'In Review' : code === 'RESOLVED' ? 'Resolved' : code === 'IGNORED' ? 'Ignored' : code
+  code === 'NEW' ? t('app.feedback.statusNew') : code === 'IN_REVIEW' ? t('app.feedback.statusInReview') : code === 'RESOLVED' ? t('app.feedback.statusResolved') : code === 'IGNORED' ? t('app.feedback.statusIgnored') : code
 const statusTone = (code: string) =>
   code === 'NEW' ? 'warning' : code === 'IN_REVIEW' ? 'info' : code === 'RESOLVED' ? 'success' : 'neutral'
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`
-}
 
 const isClosed = computed(() =>
   detail.value?.status === 'RESOLVED' || detail.value?.status === 'IGNORED')
@@ -56,6 +49,14 @@ watch(
   },
 )
 
+// A bell deep-link can point at a different VOC while the popup is open.
+watch(
+  () => props.feedbackId,
+  (id) => {
+    if (props.open && id != null) load()
+  },
+)
+
 function close() {
   emit('update:open', false)
 }
@@ -64,12 +65,12 @@ function close() {
 <template>
   <PrismDialog
     :model-value="open"
-    title="My Feedback"
+    :title="t('app.feedback.myTitle')"
     size="md"
     @update:model-value="(v) => !v && close()"
     @close="close"
   >
-    <div v-if="loading || !detail" class="mf-loading">Loading…</div>
+    <div v-if="loading || !detail" class="mf-loading">{{ t('app.feedback.loading') }}</div>
     <div v-else class="mf">
       <div class="mf-badges">
         <PrismBadge :tone="typeTone(detail.type)">{{ typeLabel(detail.type) }}</PrismBadge>
@@ -77,28 +78,28 @@ function close() {
       </div>
 
       <div class="mf-meta">
-        <span>Submitted: {{ formatDateTime(detail.createdAt) }}</span>
+        <span>{{ t('app.feedback.metaSubmitted') }} {{ formatDateTime(detail.createdAt) }}</span>
       </div>
 
       <div class="rich-content" v-html="sanitizeHtml(detail.content)"></div>
 
       <div v-if="detail.screenshot" class="mf-screenshot">
-        <img :src="detail.screenshot" alt="Feedback screenshot" />
+        <img :src="detail.screenshot" :alt="t('app.feedback.screenshotAlt')" />
       </div>
 
       <div v-if="isClosed" class="mf-resolution">
         <p class="mf-resolution-label">
           {{ statusLabel(detail.status) }}
-          <template v-if="detail.resolvedByName"> by {{ detail.resolvedByName }}</template>
-          <template v-if="detail.resolvedAt"> on {{ formatDateTime(detail.resolvedAt) }}</template>
+          <template v-if="detail.resolvedByName"> {{ t('app.feedback.by') }} {{ detail.resolvedByName }}</template>
+          <template v-if="detail.resolvedAt"> {{ t('app.feedback.on') }} {{ formatDateTime(detail.resolvedAt) }}</template>
         </p>
         <p v-if="detail.resolutionNote" class="mf-resolution-note">{{ detail.resolutionNote }}</p>
       </div>
-      <p v-else class="mf-pending">Your feedback is being reviewed. We will notify you once it is handled.</p>
+      <p v-else class="mf-pending">{{ t('app.feedback.myReviewing') }}</p>
     </div>
 
     <template #footer>
-      <PrismButton variant="secondary" @click="close">Close</PrismButton>
+      <PrismButton variant="secondary" @click="close">{{ t('app.common.close') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home Banner</title>
+  <link rel="stylesheet" href="prism-tokens.css">
+  <link rel="stylesheet" href="banner.css">
+  <link rel="stylesheet" href="neon.css">
+  <link rel="stylesheet" href="motion.css">
+  <link rel="stylesheet" href="prism-theme.css">
+  <link rel="stylesheet" href="neon-classroom.css">
+  <style>
+    /* Standalone banner page (loaded in an iframe behind the Home content):
+       fill the whole iframe instead of the demo's centered 3:1 frame. */
+    html, body { margin: 0; height: 100%; background: #090626; }
+    .ai-banner { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; }
+  </style>
+</head>
+<body class="motion-forced">
+  <section class="ai-banner" aria-label="AI banner with an interactive robot">
+    <div class="prism-beam" aria-hidden="true"></div>
+    <svg class="prism-wireframe" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true"><path d="M-60 302C130 300 125 88 360 108S740 335 985 234 1100 92 1280 112"/><path d="M-70 340C130 340 160 130 370 148S730 375 1000 272 1110 132 1290 154"/><path d="M75 340H255V282H410M1070 60H990V116H885"/><circle cx="410" cy="282" r="3"/><circle cx="885" cy="116" r="3"/></svg>
+    <div class="prism-window window-back" aria-hidden="true"><span class="prism-panel-titlebar"><i></i><i></i><i></i></span><div class="prism-panel-outline"></div><div class="prism-panel-bars"><i></i><i></i><i></i></div></div>
+    <div class="prism-window window-front" aria-hidden="true"><div class="prism-panel-chart"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="neon-aurora" aria-hidden="true"></div>
+    <div class="neon-field" aria-hidden="true"></div>
+    <div class="neon-halo" aria-hidden="true"><i></i><i></i></div>
+    <div class="pointer-light" aria-hidden="true"></div>
+    <div class="orbit" aria-hidden="true"></div>
+    <div class="robot-position">
+      <div class="robot-travel">
+      <div class="robot-float">
+        <button class="robot" type="button" aria-label="Play with the robot: click to send hearts, or drag to move">
+          <span class="robot-turn">
+          <span class="robot-rig">
+          <svg class="rig-defs" aria-hidden="true"><defs>
+            <clipPath id="rig-head" clipPathUnits="objectBoundingBox"><path d="M0 0H1V.515H0Z"/></clipPath>
+            <clipPath id="rig-arm-left" clipPathUnits="objectBoundingBox"><path d="M.365 .545L.395 .568L.393 .65L.31 .82L.23 .88H.15V.73L.29 .58Z"/></clipPath>
+            <clipPath id="rig-arm-right" clipPathUnits="objectBoundingBox"><path d="M.68 .584L.76 .59L.90 .83V.90H.77L.64 .70V.64Z"/></clipPath>
+            <clipPath id="rig-torso" clipPathUnits="objectBoundingBox"><path clip-rule="evenodd" d="M0 0H1V1H0Z M0 0H1V.515H0Z M.365 .545L.395 .568L.393 .65L.31 .82L.23 .88H.15V.73L.29 .58Z M.68 .584L.76 .59L.90 .83V.90H.77L.64 .70V.64Z"/></clipPath>
+          </defs></svg>
+          <span class="skeleton-torso"><img class="robot-body" src="assets/robot-right.png" alt="A white and lavender robot with LED eyes and softly moving joints" draggable="false"><span class="part-tint"></span></span>
+          <span class="robot-arm-left" aria-hidden="true"><img src="assets/robot-right.png" alt="" draggable="false"><span class="part-tint"></span></span>
+          <span class="robot-arm" aria-hidden="true"><img src="assets/robot-right.png" alt="" draggable="false"><span class="part-tint"></span></span>
+          <span class="neck-joint" aria-hidden="true"></span>
+          <span class="robot-head">
+          <img src="assets/robot-right.png" alt="" aria-hidden="true" draggable="false">
+          <span class="eye-glint eye-left" aria-hidden="true"></span><span class="eye-glint eye-right" aria-hidden="true"></span>
+          <span class="eye-lid lid-left" aria-hidden="true"></span><span class="eye-lid lid-right" aria-hidden="true"></span>
+          <span class="eye-brow brow-left" aria-hidden="true"></span><span class="eye-brow brow-right" aria-hidden="true"></span>
+          <span class="cheek cheek-left" aria-hidden="true"></span><span class="cheek cheek-right" aria-hidden="true"></span>
+          <span class="part-tint" aria-hidden="true"></span>
+          </span>
+          </span>
+          </span>
+        </button>
+        <div class="speech" role="status" aria-live="polite"></div>
+        <span class="sleep-z" aria-hidden="true">z<span>z</span><small>z</small></span>
+      </div>
+      </div>
+    </div>
+    <div class="particles" aria-hidden="true"></div>
+  </section>
+  <script src="robot-3d.js"></script>
+  <script src="banner.js"></script>
+</body>
+</html>

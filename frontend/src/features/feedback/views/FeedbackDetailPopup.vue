@@ -8,10 +8,12 @@ import { adminFeedbackApi } from '@/features/feedback/api'
 import { toUserError } from '@/lib/api'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { useI18nStore } from '@/stores/i18n'
 import type { FeedbackDetailResponse, FeedbackStatus } from '@/features/feedback/types'
 
 const props = defineProps<{ open: boolean; feedbackId: number | null }>()
 const emit = defineEmits(['update:open', 'saved'])
+const { t, formatDateTime } = useI18nStore()
 
 const detail = ref<FeedbackDetailResponse | null>(null)
 const loading = ref(false)
@@ -20,22 +22,13 @@ const note = ref('')
 const noteError = ref('')
 
 const typeLabel = (code: string) =>
-  code === 'BUG' ? '🐞 Bug' : code === 'SUGGESTION' ? '💡 Suggestion' : code === 'QUESTION' ? '❓ Question' : code
+  code === 'BUG' ? '🐞 ' + t('app.feedback.typeBug') : code === 'SUGGESTION' ? '💡 ' + t('app.feedback.typeSuggestion') : code === 'QUESTION' ? '❓ ' + t('app.feedback.typeQuestion') : code
 const typeTone = (code: string) =>
   code === 'BUG' ? 'danger' : code === 'SUGGESTION' ? 'info' : 'neutral'
 const statusLabel = (code: string) =>
-  code === 'NEW' ? 'New' : code === 'IN_REVIEW' ? 'In Review' : code === 'RESOLVED' ? 'Resolved' : code === 'IGNORED' ? 'Ignored' : code
+  code === 'NEW' ? t('app.feedback.statusNew') : code === 'IN_REVIEW' ? t('app.feedback.statusInReview') : code === 'RESOLVED' ? t('app.feedback.statusResolved') : code === 'IGNORED' ? t('app.feedback.statusIgnored') : code
 const statusTone = (code: string) =>
   code === 'NEW' ? 'warning' : code === 'IN_REVIEW' ? 'info' : code === 'RESOLVED' ? 'success' : 'neutral'
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`
-}
 
 async function load() {
   if (!props.feedbackId) return
@@ -70,7 +63,7 @@ const isClosed = computed(() =>
 async function changeStatus(status: FeedbackStatus, requireNote: boolean) {
   if (!props.feedbackId || !detail.value) return
   if (requireNote && !note.value.trim()) {
-    noteError.value = 'A note is required.'
+    noteError.value = t('app.feedback.noteRequired')
     return
   }
   noteError.value = ''
@@ -81,10 +74,10 @@ async function changeStatus(status: FeedbackStatus, requireNote: boolean) {
       resolutionNote: note.value.trim() || undefined,
     })
     toastSuccess(status === 'IN_REVIEW'
-      ? 'Feedback marked as in review.'
+      ? t('app.feedback.inReviewToast')
       : status === 'RESOLVED'
-        ? 'Feedback resolved.'
-        : 'Feedback ignored.')
+        ? t('app.feedback.resolvedToast')
+        : t('app.feedback.ignoredToast'))
     emit('saved')
     emit('update:open', false)
   } catch (err) {
@@ -98,14 +91,14 @@ async function changeStatus(status: FeedbackStatus, requireNote: boolean) {
 <template>
   <PrismDialog
     :model-value="open"
-    title="Feedback Detail"
+    :title="t('app.feedback.detailTitle')"
     size="lg"
     :close-on-overlay="!busy"
     :close-on-escape="!busy"
     @update:model-value="(v) => !v && requestClose()"
     @close="requestClose"
   >
-    <div v-if="loading || !detail" class="fd-loading">Loading…</div>
+    <div v-if="loading || !detail" class="fd-loading">{{ t('app.feedback.loading') }}</div>
     <div v-else class="fd">
       <div class="fd-badges">
         <PrismBadge :tone="typeTone(detail.type)">{{ typeLabel(detail.type) }}</PrismBadge>
@@ -113,20 +106,20 @@ async function changeStatus(status: FeedbackStatus, requireNote: boolean) {
       </div>
 
       <div class="fd-meta">
-        <span>User: {{ detail.userName ?? '—' }} ({{ detail.userEmail ?? '—' }})</span>
-        <span>Created: {{ formatDateTime(detail.createdAt) }}</span>
+        <span>{{ t('app.feedback.metaUser') }} {{ detail.userName ?? '—' }} ({{ detail.userEmail ?? '—' }})</span>
+        <span>{{ t('app.feedback.metaCreated') }} {{ formatDateTime(detail.createdAt) }}</span>
       </div>
 
       <div class="rich-content" v-html="sanitizeHtml(detail.content)"></div>
 
       <div v-if="detail.screenshot" class="fd-screenshot">
-        <img :src="detail.screenshot" alt="Feedback screenshot" />
+        <img :src="detail.screenshot" :alt="t('app.feedback.screenshotAlt')" />
       </div>
 
       <div v-if="detail.status === 'RESOLVED' || detail.status === 'IGNORED'" class="fd-resolution">
         <p class="fd-resolution-label">
-          {{ statusLabel(detail.status) }} by {{ detail.resolvedByName ?? '—' }}
-          <template v-if="detail.resolvedAt"> on {{ formatDateTime(detail.resolvedAt) }}</template>
+          {{ statusLabel(detail.status) }} {{ t('app.feedback.by') }} {{ detail.resolvedByName ?? '—' }}
+          <template v-if="detail.resolvedAt"> {{ t('app.feedback.on') }} {{ formatDateTime(detail.resolvedAt) }}</template>
         </p>
         <p v-if="detail.resolutionNote" class="fd-resolution-note">{{ detail.resolutionNote }}</p>
       </div>
@@ -138,7 +131,7 @@ async function changeStatus(status: FeedbackStatus, requireNote: boolean) {
           :rows="3"
           :maxlength="500"
           :error="noteError"
-          placeholder="Note (required for Resolve / Ignore)…"
+          :placeholder="t('app.feedback.notePh')"
         />
         <div class="fd-actions-buttons">
           <PrismButton
@@ -147,16 +140,16 @@ async function changeStatus(status: FeedbackStatus, requireNote: boolean) {
             :loading="busy"
             @click="changeStatus('IN_REVIEW', false)"
           >
-            Mark In Review
+            {{ t('app.feedback.markInReview') }}
           </PrismButton>
-          <PrismButton :loading="busy" @click="changeStatus('RESOLVED', true)">Resolve</PrismButton>
-          <PrismButton variant="danger" :loading="busy" @click="changeStatus('IGNORED', true)">Ignore</PrismButton>
+          <PrismButton :loading="busy" @click="changeStatus('RESOLVED', true)">{{ t('app.feedback.resolve') }}</PrismButton>
+          <PrismButton variant="danger" :loading="busy" @click="changeStatus('IGNORED', true)">{{ t('app.feedback.ignore') }}</PrismButton>
         </div>
       </div>
     </div>
 
     <template #footer>
-      <PrismButton variant="secondary" :disabled="busy" @click="requestClose">Close</PrismButton>
+      <PrismButton variant="secondary" :disabled="busy" @click="requestClose">{{ t('app.common.close') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>

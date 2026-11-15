@@ -3,7 +3,8 @@ import type { NotificationItem } from './types'
 
 export const notificationApi = {
   unreadCount: () => request<{ unreadCount: number }>(api.get('/notifications/unread-count')),
-  list: (limit = 10) => request<NotificationItem[]>(api.get('/notifications', { params: { limit } })),
+  list: (limit = 20, cursorId?: number) =>
+    request<NotificationItem[]>(api.get('/notifications', { params: { limit, cursorId } })),
   markRead: (notificationId: number) =>
     request<void>(api.post(`/notifications/${notificationId}/read`)),
   markAllRead: () => request<void>(api.post('/notifications/read-all')),

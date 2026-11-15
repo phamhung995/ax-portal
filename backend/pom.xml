@@ -8,7 +8,7 @@
 		<version>3.4.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com</groupId>
+	<groupId>com.furelise</groupId>
 	<artifactId>skill-management</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>skill-management</name>
@@ -16,6 +16,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<jjwt.version>0.12.6</jjwt.version>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
 	</properties>
 	<dependencies>
 		<!-- Web -->
@@ -65,7 +67,7 @@
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 
-		<!-- Mail (IMAP reader for AI News batch job, AI_News_Batch.md §3) -->
+		<!-- Mail (MIME parsing for .mht import, AI_News_Screen_SRS.md FR-21) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>
@@ -82,7 +84,7 @@
 		<dependency>
 			<groupId>org.jsoup</groupId>
 			<artifactId>jsoup</artifactId>
-			<version>1.10.2</version>
+			<version>1.17.2</version>
 		</dependency>
 
 		<!-- JWT (jjwt 0.12.x) -->

@@ -1,13 +1,16 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;INIT=CREATE DOMAIN IF NOT EXISTS JSONB AS TEXT
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
   jpa:
     hibernate:
       ddl-auto: create-drop
-    database-platform: org.hibernate.dialect.H2Dialect
+    # NOTE: do NOT set database-platform here. The main application.yml sets
+    # PostgreSQLDialect, which emits the jsonb column type the entities use.
+    # H2 does not know jsonb natively, so the URL above creates a JSONB
+    # domain (as TEXT) via INIT.
   flyway:
     enabled: false
 

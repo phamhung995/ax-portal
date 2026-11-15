@@ -6,10 +6,12 @@ import PrismInput from '@/design-system/components/PrismInput.vue'
 import { skillTaxonomyApi } from '@/features/skills/api'
 import { toUserError } from '@/lib/api'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { useI18nStore } from '@/stores/i18n'
 import type { SkillTaxonomyItem } from '@/features/skills/types'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits(['update:open', 'changed'])
+const { t } = useI18nStore()
 
 const categories = ref<SkillTaxonomyItem[]>([])
 const stages = ref<SkillTaxonomyItem[]>([])
@@ -43,7 +45,7 @@ async function saveEditStage() {
   savingStage.value = true
   try {
     await skillTaxonomyApi.updateStage(editStageId.value, name, editStageDesc.value.trim() || undefined)
-    toastSuccess(`Stage "${name}" updated.`)
+    toastSuccess(t('app.skills.stageUpdated', { name }))
     closeEditStage()
     await load()
     emit('changed')
@@ -75,7 +77,7 @@ async function saveEditCategory() {
   savingCategory.value = true
   try {
     await skillTaxonomyApi.updateCategory(editCategoryId.value, name)
-    toastSuccess(`Category "${name}" updated.`)
+    toastSuccess(t('app.skills.catUpdated', { name }))
     closeEditCategory()
     await load()
     emit('changed')
@@ -121,7 +123,7 @@ async function addCategory() {
   try {
     await skillTaxonomyApi.createCategory(name)
     newCategory.value = ''
-    toastSuccess(`Category "${name}" added.`)
+    toastSuccess(t('app.skills.catAdded', { name }))
     await load()
     emit('changed')
   } catch (err) {
@@ -133,12 +135,12 @@ async function addCategory() {
 
 async function deleteCategory(item: SkillTaxonomyItem) {
   const message = item.skillCount > 0
-    ? `Delete category "${item.name}"? It will be removed from ${item.skillCount} skill(s).`
-    : `Delete category "${item.name}"?`
+    ? t('app.skills.catDeleteDesc', { name: item.name, n: item.skillCount })
+    : t('app.skills.catDeleteDescSimple', { name: item.name })
   if (!confirm(message)) return
   try {
     await skillTaxonomyApi.deleteCategory(item.id)
-    toastSuccess(`Category "${item.name}" deleted.`)
+    toastSuccess(t('app.skills.catDeleted', { name: item.name }))
     await load()
     emit('changed')
   } catch (err) {
@@ -154,7 +156,7 @@ async function addStage() {
     await skillTaxonomyApi.createStage(name, newStageDesc.value.trim() || undefined)
     newStage.value = ''
     newStageDesc.value = ''
-    toastSuccess(`Stage "${name}" added.`)
+    toastSuccess(t('app.skills.stageAdded', { name }))
     await load()
     emit('changed')
   } catch (err) {
@@ -166,12 +168,12 @@ async function addStage() {
 
 async function deleteStage(item: SkillTaxonomyItem) {
   const message = item.skillCount > 0
-    ? `Delete stage "${item.name}"? It will be removed from ${item.skillCount} skill(s).`
-    : `Delete stage "${item.name}"?`
+    ? t('app.skills.stageDeleteDesc', { name: item.name, n: item.skillCount })
+    : t('app.skills.stageDeleteDescSimple', { name: item.name })
   if (!confirm(message)) return
   try {
     await skillTaxonomyApi.deleteStage(item.id)
-    toastSuccess(`Stage "${item.name}" deleted.`)
+    toastSuccess(t('app.skills.stageDeleted', { name: item.name }))
     await load()
     emit('changed')
   } catch (err) {
@@ -187,59 +189,59 @@ function close() {
 <template>
   <PrismDialog
     :model-value="open"
-    title="Manage Categories & Process Stages"
+    :title="t('app.skills.manageTaxonomyTitle')"
     size="lg"
     :close-on-overlay="true"
     :close-on-escape="true"
     @update:model-value="(v) => !v && close()"
     @close="close"
   >
-    <div v-if="loading" class="mgt-loading">Loading…</div>
+    <div v-if="loading" class="mgt-loading">{{ t('app.common.loading') }}</div>
     <div v-else class="mgt">
       <div class="mgt-cols">
         <!-- Categories -->
         <div class="mgt-col">
           <h3 class="mgt-title">
             <span class="mgt-dot mgt-dot--cat" aria-hidden="true"></span>
-            Categories
+            {{ t('app.skills.categories') }}
             <span class="mgt-count">({{ categories.length }})</span>
           </h3>
           <ul class="mgt-list">
             <li v-for="c in categories" :key="c.id" class="mgt-item">
               <span class="mgt-name" :title="c.name">{{ c.name }}</span>
-              <span class="mgt-use">{{ c.skillCount }} skill{{ c.skillCount === 1 ? '' : 's' }}</span>
+              <span class="mgt-use">{{ t('app.skills.skillCount', { n: c.skillCount }) }}</span>
               <button
                 type="button"
                 class="mgt-edit"
-                :aria-label="`Edit category ${c.name}`"
+                :aria-label="t('app.skills.editCategoryAria', { name: c.name })"
                 @click="openEditCategory(c)"
               >✎</button>
               <button
                 type="button"
                 class="mgt-del"
-                :aria-label="`Delete category ${c.name}`"
+                :aria-label="t('app.skills.deleteCategoryAria', { name: c.name })"
                 @click="deleteCategory(c)"
               >✕</button>
             </li>
-            <li v-if="!categories.length" class="mgt-empty">No categories yet.</li>
+            <li v-if="!categories.length" class="mgt-empty">{{ t('app.skills.noCategoriesYet') }}</li>
           </ul>
           <div class="mgt-add">
             <PrismInput
               v-model="newCategory"
-              placeholder="New category name"
+              :placeholder="t('app.skills.newCategoryPh')"
               :maxlength="50"
               @keydown.enter="addCategory"
             />
-            <PrismButton :loading="addingCategory" :disabled="!newCategory.trim()" @click="addCategory">Add</PrismButton>
+            <PrismButton :loading="addingCategory" :disabled="!newCategory.trim()" @click="addCategory">{{ t('app.common.add') }}</PrismButton>
           </div>
-          <p class="mgt-locked">🔒 Admin only. Deleting a category removes it from all skills using it.</p>
+          <p class="mgt-locked">{{ t('app.skills.adminOnlyCat') }}</p>
         </div>
 
         <!-- Process stages -->
         <div class="mgt-col">
           <h3 class="mgt-title">
             <span class="mgt-dot mgt-dot--stage" aria-hidden="true"></span>
-            Process Stages
+            {{ t('app.skills.processStages') }}
             <span class="mgt-count">({{ stages.length }})</span>
           </h3>
           <ul class="mgt-list">
@@ -249,26 +251,26 @@ function close() {
                 <span class="mgt-name" :title="st.name">{{ st.name }}</span>
                 <span v-if="st.description" class="mgt-desc" :title="st.description">{{ st.description }}</span>
               </span>
-              <span class="mgt-use">{{ st.skillCount }} skill{{ st.skillCount === 1 ? '' : 's' }}</span>
+              <span class="mgt-use">{{ t('app.skills.skillCount', { n: st.skillCount }) }}</span>
               <button
                 type="button"
                 class="mgt-edit"
-                :aria-label="`Edit stage ${st.name}`"
+                :aria-label="t('app.skills.editStageAria', { name: st.name })"
                 @click="openEditStage(st)"
               >✎</button>
               <button
                 type="button"
                 class="mgt-del"
-                :aria-label="`Delete stage ${st.name}`"
+                :aria-label="t('app.skills.deleteStageAria', { name: st.name })"
                 @click="deleteStage(st)"
               >✕</button>
             </li>
-            <li v-if="!stages.length" class="mgt-empty">No stages yet.</li>
+            <li v-if="!stages.length" class="mgt-empty">{{ t('app.skills.noStagesYet') }}</li>
           </ul>
           <div class="mgt-add">
             <PrismInput
               v-model="newStage"
-              placeholder="New stage name"
+              :placeholder="t('app.skills.newStagePh')"
               :maxlength="50"
               @keydown.enter="addStage"
             />
@@ -276,25 +278,25 @@ function close() {
           <div class="mgt-add">
             <PrismInput
               v-model="newStageDesc"
-              placeholder="Short description (optional)"
+              :placeholder="t('app.skills.stageDescPh')"
               :maxlength="200"
               @keydown.enter="addStage"
             />
-            <PrismButton :loading="addingStage" :disabled="!newStage.trim()" @click="addStage">Add</PrismButton>
+            <PrismButton :loading="addingStage" :disabled="!newStage.trim()" @click="addStage">{{ t('app.common.add') }}</PrismButton>
           </div>
-          <p class="mgt-locked">🔒 Admin only. Stages keep their order in the pipeline.</p>
+          <p class="mgt-locked">{{ t('app.skills.adminOnlyStage') }}</p>
         </div>
       </div>
     </div>
 
     <template #footer>
-      <PrismButton variant="secondary" @click="close">Close</PrismButton>
+      <PrismButton variant="secondary" @click="close">{{ t('app.common.close') }}</PrismButton>
     </template>
   </PrismDialog>
 
   <PrismDialog
     :model-value="editCategoryOpen"
-    title="Edit Category"
+    :title="t('app.skills.editCategoryTitle')"
     size="sm"
     @update:model-value="(v) => !v && closeEditCategory()"
     @close="closeEditCategory"
@@ -302,20 +304,20 @@ function close() {
     <div class="mgt-edit-form">
       <PrismInput
         v-model="editCategoryName"
-        label="Category name"
+        :label="t('app.skills.categoryName')"
         required
         :maxlength="50"
       />
     </div>
     <template #footer>
-      <PrismButton variant="secondary" @click="closeEditCategory">Cancel</PrismButton>
-      <PrismButton :loading="savingCategory" :disabled="!editCategoryName.trim()" @click="saveEditCategory">Save</PrismButton>
+      <PrismButton variant="secondary" @click="closeEditCategory">{{ t('app.common.cancel') }}</PrismButton>
+      <PrismButton :loading="savingCategory" :disabled="!editCategoryName.trim()" @click="saveEditCategory">{{ t('app.common.save') }}</PrismButton>
     </template>
   </PrismDialog>
 
   <PrismDialog
     :model-value="editOpen"
-    title="Edit Process Stage"
+    :title="t('app.skills.editStageTitle')"
     size="sm"
     @update:model-value="(v) => !v && closeEditStage()"
     @close="closeEditStage"
@@ -323,20 +325,20 @@ function close() {
     <div class="mgt-edit-form">
       <PrismInput
         v-model="editStageName"
-        label="Stage name"
+        :label="t('app.skills.stageName')"
         required
         :maxlength="50"
       />
       <PrismInput
         v-model="editStageDesc"
-        label="Short description"
-        placeholder="Optional"
+        :label="t('app.skills.stageDescLabel')"
+        :placeholder="t('app.skills.optional')"
         :maxlength="200"
       />
     </div>
     <template #footer>
-      <PrismButton variant="secondary" @click="closeEditStage">Cancel</PrismButton>
-      <PrismButton :loading="savingStage" :disabled="!editStageName.trim()" @click="saveEditStage">Save</PrismButton>
+      <PrismButton variant="secondary" @click="closeEditStage">{{ t('app.common.cancel') }}</PrismButton>
+      <PrismButton :loading="savingStage" :disabled="!editStageName.trim()" @click="saveEditStage">{{ t('app.common.save') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>

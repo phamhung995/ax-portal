@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ImagePlus, X } from 'lucide-vue-next'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import PrismButton from '@/design-system/components/PrismButton.vue'
@@ -8,17 +8,19 @@ import { toUserError } from '@/lib/api'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { stripHtml } from '@/lib/sanitize'
 import { fileToDataUri } from '@/lib/imageCompress'
+import { useI18nStore } from '@/stores/i18n'
 import type { FeedbackType } from '@/features/feedback/types'
 
 const emit = defineEmits<{
   (e: 'submitted'): void
 }>()
+const { t } = useI18nStore()
 
-const TYPE_OPTIONS: { value: FeedbackType; label: string }[] = [
-  { value: 'BUG', label: '🐞 Bug' },
-  { value: 'SUGGESTION', label: '💡 Suggestion' },
-  { value: 'QUESTION', label: '❓ Question' },
-]
+const TYPE_OPTIONS = computed(() => [
+  { value: 'BUG' as FeedbackType, label: '🐞 ' + t('app.feedback.typeBug') },
+  { value: 'SUGGESTION' as FeedbackType, label: '💡 ' + t('app.feedback.typeSuggestion') },
+  { value: 'QUESTION' as FeedbackType, label: '❓ ' + t('app.feedback.typeQuestion') },
+])
 
 const type = ref<FeedbackType>('BUG')
 const content = ref('')
@@ -40,7 +42,7 @@ async function onScreenshotPicked(ev: Event) {
   if (!file) return
   const dataUri = await fileToDataUri(file)
   if (!dataUri) {
-    toastError('Unsupported image. Allowed: .jpg, .jpeg, .png, .webp (max 5MB).')
+    toastError(t('app.feedback.imageError'))
     return
   }
   screenshot.value = dataUri
@@ -55,11 +57,11 @@ function removeScreenshot() {
 async function onSubmit() {
   const text = stripHtml(content.value).trim()
   if (!text) {
-    contentError.value = 'Please describe your feedback.'
+    contentError.value = t('app.feedback.descRequired')
     return
   }
   if (text.length > 1000) {
-    contentError.value = 'Feedback text is at most 1000 characters.'
+    contentError.value = t('app.feedback.descTooLong')
     return
   }
   contentError.value = ''
@@ -70,7 +72,7 @@ async function onSubmit() {
       content: content.value.trim(),
       screenshot: screenshot.value || undefined,
     })
-    toastSuccess('Thank you for your feedback!')
+    toastSuccess(t('app.feedback.thanksToast'))
     emit('submitted')
   } catch (err) {
     toastError(toUserError(err).message)
@@ -83,10 +85,10 @@ async function onSubmit() {
 <template>
   <div class="fb-form">
     <p class="fb-intro">
-      Found a bug or have a suggestion? Let us know — your feedback helps us improve the system.
+      {{ t('app.feedback.formIntro') }}
     </p>
 
-    <div class="fb-type" role="radiogroup" aria-label="Feedback type">
+    <div class="fb-type" role="radiogroup" :aria-label="t('app.feedback.typeAria')">
       <button
         v-for="opt in TYPE_OPTIONS"
         :key="opt.value"
@@ -103,17 +105,17 @@ async function onSubmit() {
 
     <RichTextEditor
       v-model="content"
-      label="Description"
+      :label="t('app.feedback.descLabel')"
       :rows="5"
       :error="contentError"
-      placeholder="Describe the issue or your suggestion…"
+      :placeholder="t('app.feedback.descPh')"
     />
 
     <div class="fb-shot">
       <template v-if="screenshot">
         <div class="fb-shot-preview">
           <img :src="screenshot" :alt="screenshotName" />
-          <button type="button" class="fb-shot-remove" aria-label="Remove screenshot" @click="removeScreenshot">
+          <button type="button" class="fb-shot-remove" :aria-label="t('app.feedback.removeScreenshotAria')" @click="removeScreenshot">
             <X :size="14" />
           </button>
         </div>
@@ -121,7 +123,7 @@ async function onSubmit() {
       </template>
       <button v-else type="button" class="fb-shot-add" @click="pickScreenshot">
         <ImagePlus :size="16" aria-hidden="true" />
-        Attach screenshot (optional)
+        {{ t('app.feedback.attachScreenshot') }}
       </button>
       <input
         ref="imageInput"
@@ -135,7 +137,7 @@ async function onSubmit() {
     </div>
 
     <div class="fb-submit">
-      <PrismButton :loading="submitting" :disabled="!stripHtml(content).trim()" @click="onSubmit">Submit</PrismButton>
+      <PrismButton :loading="submitting" :disabled="!stripHtml(content).trim()" @click="onSubmit">{{ t('app.feedback.submit') }}</PrismButton>
     </div>
   </div>
 </template>

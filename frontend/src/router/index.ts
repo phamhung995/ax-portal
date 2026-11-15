@@ -1,12 +1,26 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore, ensureSession, TOKEN_KEY, REFRESH_KEY } from '@/stores/auth'
+import { useI18nStore } from '@/stores/i18n'
+import { isIntroductionEnabled } from '@/config/introduction'
+
+/**
+ * Landing path after login / on the root route. On local + dev the
+ * Introduction page is shown ONCE per session (sessionStorage flag set by
+ * IntroductionView on mount) — afterwards the user lands on Home normally.
+ */
+export function landingPath(): string {
+  if (isIntroductionEnabled() && !sessionStorage.getItem('ax-intro-seen')) {
+    return '/introduction'
+  }
+  return '/home'
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      redirect: '/home',
+      redirect: () => landingPath(),
     },
     // Guest (unauthenticated) routes
     {
@@ -53,15 +67,27 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/skill-requests',
-      name: 'skill-requests',
-      component: () => import('@/features/skill-requests/views/SkillRequestManagementView.vue'),
+      path: '/skill-market',
+      name: 'skill-market',
+      component: () => import('@/features/skill-market/views/SkillRequestManagementView.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/skill-requests/:id',
-      name: 'skill-request-detail',
-      component: () => import('@/features/skill-requests/views/SkillRequestDetailView.vue'),
+      path: '/skill-market/:id',
+      name: 'skill-market-detail',
+      component: () => import('@/features/skill-market/views/SkillRequestDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/ai-tools',
+      name: 'ai-tools',
+      component: () => import('@/features/ai-tools/views/AiToolManagementView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/mcps',
+      name: 'mcps',
+      component: () => import('@/features/mcp/views/McpManagementView.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -83,9 +109,21 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
+      path: '/translations',
+      name: 'translations',
+      component: () => import('@/features/translations/views/TranslationManagementView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('@/features/users/views/SettingsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/introduction',
+      name: 'introduction',
+      component: () => import('@/features/app/IntroductionView.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -104,8 +142,9 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
-  // Resolve the session before deciding the redirect: an expired access token
-  // is silently refreshed so the user is not bounced to /home first.
+  // Resolve the session FIRST so the i18n fetch below runs with a valid
+  // token. An expired access token is silently refreshed so the user is
+  // not bounced to /home first.
   //
   // When the destination is a guest page (e.g. /login) and a token exists,
   // force a server-side verification (refresh) BEFORE redirecting to /home.
@@ -121,12 +160,22 @@ router.beforeEach(async (to) => {
     }
   }
 
+  // Load i18n preferences + messages BEFORE rendering: the first render
+  // must already have the full message set, otherwise a brief flash of raw
+  // i18n keys is visible (stale/empty cache). init() is idempotent for
+  // successful bootstraps; a failed one (e.g. 401 before login) is
+  // retried on the next navigation.
+  if (to.meta.requiresAuth || to.meta.requiresGuest) {
+    const i18n = useI18nStore()
+    await i18n.init()
+  }
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   if (to.meta.requiresGuest && auth.isAuthenticated) {
-    return { name: 'home' }
+    return landingPath()
   }
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {

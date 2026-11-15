@@ -14,21 +14,25 @@ import BulkUploadPopup from '@/features/users/views/BulkUploadPopup.vue'
 import UserDetailPopup from '@/features/users/views/UserDetailPopup.vue'
 import { adminUserApi } from '@/features/users/api'
 import { toUserError } from '@/lib/api'
+import { orgsLabel } from '@/lib/types'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { useUserListStore } from '@/features/users/store'
 import type { UserListItem } from '@/features/users/types'
+import { useI18nStore } from '@/stores/i18n'
 
+const i18n = useI18nStore()
+const { t, formatDate } = i18n
 const list = useUserListStore()
 const s = list.state
 
-const ROLE_OPTIONS = [
-  { label: 'Normal User', value: 'NORMAL_USER' },
-  { label: 'Admin User', value: 'ADMIN_USER' },
-]
-const STATUS_OPTIONS = [
-  { label: 'Active', value: 'ACTIVE' },
-  { label: 'Deactive', value: 'DEACTIVE' },
-]
+const ROLE_OPTIONS = computed(() => [
+  { label: t('app.common.normalUser'), value: 'NORMAL_USER' },
+  { label: t('app.common.adminUser'), value: 'ADMIN_USER' },
+])
+const STATUS_OPTIONS = computed(() => [
+  { label: t('app.common.active'), value: 'ACTIVE' },
+  { label: t('app.common.deactive'), value: 'DEACTIVE' },
+])
 const PAGE_SIZES = [10, 20, 50, 100]
 
 const orgOptions = ref<{ label: string; value: string }[]>([])
@@ -42,23 +46,14 @@ async function loadOrgOptions() {
 }
 
 const roleLabel = (code: string) =>
-  code === 'ADMIN_USER' ? 'Admin User' : code === 'NORMAL_USER' ? 'Normal User' : code
+  code === 'ADMIN_USER' ? t('app.common.adminUser') : code === 'NORMAL_USER' ? t('app.common.normalUser') : code
 const statusLabel = (code: string) =>
-  code === 'DEACTIVE' ? 'Deactive' : code === 'ACTIVE' ? 'Active' : code
-const orgLabel = (u: UserListItem) => {
-  if (u.orgs.length === 0) return '—'
-  return u.orgs.map((o) => `${o.part} > ${o.group}`).join('; ')
-}
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()}`
-}
+  code === 'DEACTIVE' ? t('app.common.deactive') : code === 'ACTIVE' ? t('app.common.active') : code
+const orgLabel = (u: UserListItem) => orgsLabel(u.orgs)
 
 const dateRangeError = computed(() => {
   if (s.createdDateFrom && s.createdDateTo && s.createdDateFrom > s.createdDateTo) {
-    return 'From Date cannot be later than To Date.'
+    return t('app.common.dateRangeError')
   }
   return ''
 })
@@ -137,7 +132,7 @@ function onPageSize(size: number) {
 
 async function onExport() {
   if (!s.items.length) {
-    toastError('No data to export. Run a search first.')
+    toastError(t('app.common.noDataToExport'))
     return
   }
   try {
@@ -147,7 +142,7 @@ async function onExport() {
       ? [...selectedIds.value]
       : s.items.map((u) => u.userId)
     await adminUserApi.exportUsers({ ...buildQuery(), ids })
-    toastSuccess('User list exported successfully.')
+    toastSuccess(t('app.users.exportedToast'))
   } catch (err) {
     toastError(toUserError(err).message)
   }
@@ -155,13 +150,13 @@ async function onExport() {
 
 const columns = computed(() => [
   { key: 'select', label: '' },
-  { key: 'userName', label: 'User Name' },
-  { key: 'knoxId', label: 'Knox ID' },
-  { key: 'email', label: 'Email' },
-  { key: 'organization', label: 'Organization' },
-  { key: 'role', label: 'Role' },
-  { key: 'status', label: 'Status' },
-  { key: 'createdAt', label: 'Created Date' },
+  { key: 'userName', label: t('app.users.colUserName') },
+  { key: 'knoxId', label: t('app.users.colKnoxId') },
+  { key: 'email', label: t('app.users.colEmail') },
+  { key: 'organization', label: t('app.users.colOrganization') },
+  { key: 'role', label: t('app.users.colRole') },
+  { key: 'status', label: t('app.users.colStatus') },
+  { key: 'createdAt', label: t('app.users.colCreatedDate') },
 ])
 
 const knoxId = (email: string | null) => (email ? email.split('@')[0] ?? '' : '')
@@ -196,31 +191,31 @@ onMounted(() => {
 <template>
   <div class="um">
     <!-- Search area -->
-    <section class="search p-glass" aria-label="Search" @keydown="onSearchKeydown">
+    <section class="search p-glass" :aria-label="t('app.common.searchAria')" @keydown="onSearchKeydown">
       <div class="search-grid">
-        <PrismInput v-model="s.userName" label="User Name" placeholder="Contains…" />
-        <PrismInput v-model="s.email" label="Email" placeholder="Contains…" />
+        <PrismInput v-model="s.userName" :label="t('app.users.searchUserName')" :placeholder="t('app.common.containsPh')" />
+        <PrismInput v-model="s.email" :label="t('app.users.searchEmail')" :placeholder="t('app.common.containsPh')" />
         <PrismCombobox
           v-model="s.organization"
-          label="Organization"
-          placeholder="Select Organization"
+          :label="t('app.common.organization')"
+          :placeholder="t('app.common.selectOrganization')"
           clearable
           :options="orgOptions"
         />
         <PrismCombobox
           v-model="s.roles"
-          label="Role"
-          placeholder="All Roles"
+          :label="t('app.common.role')"
+          :placeholder="t('app.common.allRoles')"
           multiple
           clearable
           :options="ROLE_OPTIONS"
         />
-        <PrismDatePicker v-model="s.createdDateFrom" label="Created From" />
-        <PrismDatePicker v-model="s.createdDateTo" label="Created To" />
+        <PrismDatePicker v-model="s.createdDateFrom" :label="t('app.common.createdFrom')" />
+        <PrismDatePicker v-model="s.createdDateTo" :label="t('app.common.createdTo')" />
         <PrismCombobox
           v-model="s.statuses"
-          label="Status"
-          placeholder="All Statuses"
+          :label="t('app.common.status')"
+          :placeholder="t('app.common.allStatuses')"
           multiple
           clearable
           :options="STATUS_OPTIONS"
@@ -229,30 +224,30 @@ onMounted(() => {
       <p v-if="dateRangeError" class="p-field-error" role="alert">{{ dateRangeError }}</p>
       <div class="search-actions">
         <PrismButton type="button" @click="createOpen = true">
-          <Plus :size="16" aria-hidden="true" /> Create User
+          <Plus :size="16" aria-hidden="true" /> {{ t('app.users.createBtn') }}
         </PrismButton>
         <PrismButton variant="secondary" type="button" @click="bulkOpen = true">
-          <Upload :size="16" aria-hidden="true" /> Bulk Upload
+          <Upload :size="16" aria-hidden="true" /> {{ t('app.users.bulkUploadBtn') }}
         </PrismButton>
         <PrismButton variant="secondary" type="button" @click="onExport">
-          <Download :size="16" aria-hidden="true" /> Export User List
+          <Download :size="16" aria-hidden="true" /> {{ t('app.users.exportBtn') }}
         </PrismButton>
         <span class="search-actions-spacer" aria-hidden="true"></span>
-        <PrismButton type="button" :loading="s.loading" @click="onSearch">Search</PrismButton>
-        <PrismButton variant="secondary" type="button" @click="onReset">Reset</PrismButton>
+        <PrismButton type="button" :loading="s.loading" @click="onSearch">{{ t('app.common.search') }}</PrismButton>
+        <PrismButton variant="secondary" type="button" @click="onReset">{{ t('app.common.reset') }}</PrismButton>
       </div>
     </section>
 
     <!-- Grid -->
-    <section class="grid p-glass" aria-label="User list">
+    <section class="grid p-glass" :aria-label="t('app.users.listAria')">
       <PrismEmptyState
         v-if="!s.hasSearched && !s.loading && !s.error"
-        title="No data found."
-        description="Enter search criteria and click Search to load users."
+        :title="t('app.common.noData')"
+        :description="t('app.users.emptyDesc')"
       />
-      <PrismEmptyState v-else-if="s.error" title="Unable to load user list.">
+      <PrismEmptyState v-else-if="s.error" :title="t('app.users.loadError')">
         <p class="grid-error-text">{{ s.error }}</p>
-        <PrismButton variant="secondary" @click="onSearch">Retry</PrismButton>
+        <PrismButton variant="secondary" @click="onSearch">{{ t('app.common.retry') }}</PrismButton>
       </PrismEmptyState>
       <template v-else>
         <PrismTable
@@ -260,14 +255,14 @@ onMounted(() => {
           :rows="s.items"
           row-key="userId"
           :loading="s.loading"
-          caption="User list"
-          empty-text="No data found."
+          :caption="t('app.common.total', { n: s.totalCount })"
+          :empty-text="t('app.common.noDataFound')"
         >
           <template #header-select>
             <input
               type="checkbox"
               :checked="allSelected"
-              aria-label="Select all rows on this page"
+              :aria-label="t('app.common.selectAllRows')"
               @change="toggleAll()"
             />
           </template>
@@ -275,7 +270,7 @@ onMounted(() => {
             <input
               type="checkbox"
               :checked="selectedIds.has((row as UserListItem).userId)"
-              :aria-label="`Select ${(row as UserListItem).userName}`"
+              :aria-label="t('app.common.selectRow', { name: (row as UserListItem).userName })"
               @change="toggleRow((row as UserListItem).userId)"
             />
           </template>
@@ -315,12 +310,16 @@ onMounted(() => {
         </PrismTable>
 
         <div class="um-pager">
-          <label class="um-pagesize">
-            Rows
-            <select :value="s.pageSize" @change="onPageSize(Number(($event.target as HTMLSelectElement).value))">
-              <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
-            </select>
-          </label>
+          <div class="um-pagesize">
+            <span class="um-pagesize-label">{{ t('app.common.rows') }}</span>
+            <PrismCombobox
+              :model-value="s.pageSize"
+              readonly
+              :aria-label="t('app.common.rowsPerPage')"
+              :options="PAGE_SIZES.map((size) => ({ value: size, label: String(size) }))"
+              @update:model-value="onPageSize(Number($event))"
+            />
+          </div>
           <PrismPagination
             :page="s.page"
             :page-size="s.pageSize"
@@ -345,14 +344,14 @@ onMounted(() => {
 }
 
 .search {
-  padding: var(--ds-space-5);
+  padding: var(--ds-space-4);
   display: grid;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 .search-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 @media (max-width: 1199px) {
   .search-grid {
@@ -411,18 +410,34 @@ onMounted(() => {
   margin-top: var(--ds-space-4);
   flex-wrap: wrap;
 }
+/* Rows (page size) — compact: label + 30px combobox, narrow width. */
 .um-pagesize {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: 13px;
+  flex-shrink: 0;
+}
+.um-pagesize-label {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ds-color-text-secondary);
 }
-.um-pagesize select {
-  background: var(--ds-input-background);
-  border: 1px solid var(--ds-color-border);
-  color: var(--ds-color-text-primary);
-  border-radius: var(--ds-radius-sm);
-  padding: 6px 8px;
+/* The combobox has no label of its own — PrismFormField still renders an
+   empty <label> row; hide it so the control sits on the same line as "Rows". */
+.um-pagesize :deep(.p-field) {
+  gap: 0;
+}
+.um-pagesize :deep(.p-field > label:empty) {
+  display: none;
+}
+.um-pagesize :deep(.p-combobox) {
+  width: 84px;
+  font-size: 12px;
+}
+.um-pagesize :deep(.p-input-wrap),
+.um-pagesize :deep(.p-input-wrap) input {
+  min-height: 30px;
+  font-size: 12px;
+  padding: 0 var(--ds-space-2);
 }
 </style>

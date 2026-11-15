@@ -1,0 +1,44 @@
+# =====================================================================
+# Local H2 test profile — DB-safe testing for AI News (NO real PostgreSQL)
+# =====================================================================
+# Activate with:  --spring.profiles.active=local-h2
+#   (IDE run config: add "local-h2" to Active profiles / VM arg
+#    -Dspring.profiles.active=local-h2)
+#
+# In-memory H2 in PostgreSQL mode. Schema is generated from JPA entities
+# (ddl-auto: create-drop), Flyway is OFF. All data is GONE on restart —
+# this profile can never touch the production/stage DB (107.120.93.231).
+#
+# The AI-news batch cron is OFF (ai-news.enabled: false) so a locally
+# running backend never fires the schedule. Trigger a run manually via
+#   POST /api/v1/admin/ai-news/run
+# or test the .mht pipeline via
+#   POST /api/v1/admin/ai-news/import   (multipart files[] = .mht)
+#
+# Admin login (seeded by DataSeeder):  admin@skillmgmt.local / Admin@12345
+# An org row for that admin is seeded by LocalH2TestSeeder so login passes.
+spring:
+  datasource:
+    url: jdbc:h2:mem:ainewstest;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+ai-news:
+  # Cron OFF for local H2 testing — manual run only.
+  enabled: false
+  # Knox portal is reachable from the dev machine (kor5.samsung.net) —
+  # a manual run can read the real inbox.
+  knox:
+    base-url: http://kor5.samsung.net
+    login-base-url: https://www.samsung.net
+  # Mailbox password for a manual portal-source test (gdcv.cag.ax).
+  # NEVER commit the real password — supply via env var (AI_NEWS_SECRET_GDC).
+  mailbox-secrets:
+    gdc-tech-support: ${AI_NEWS_SECRET_GDC:}

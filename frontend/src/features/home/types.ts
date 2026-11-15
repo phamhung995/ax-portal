@@ -35,6 +35,10 @@ export interface CommunitySkillItem {
   viewCount: number | null
   ratingScore: number | null
   ratingCount: number
+  /** Category names (empty when the skill has no category). */
+  categories: string[]
+  /** Process stage names in pipeline order (empty when unmapped). */
+  stages: string[]
 }
 
 export interface CommunitySkills {
@@ -43,23 +47,28 @@ export interface CommunitySkills {
   new: CommunitySkillItem[]
 }
 
-/** A Feature Request row in the New Request card (Home SRS §7.3). */
-export interface NewRequestItem {
-  requestId: string
-  title: string
-  category: string
-  status: string
-  requesterName: string
-  createdAt: string
+/** Chart tab selector data (Home_Chart_SRS §6.1). */
+export interface ChartDimensions {
+  groups: string[]
+  partsByGroup: Record<string, string[]>
 }
 
-/** Real activity data for the Home chart tab (GET /home/activity). */
-export interface HomeActivity {
-  weeks: number
-  /** Per-week view counts, oldest first (length = weeks). */
-  weeklyViews: number[]
-  /** Per-week skill-update counts, oldest first (length = weeks). */
-  weeklyUpdates: number[]
-  /** Per-day view counts, oldest first (length = weeks × 7). */
-  dailyViews: number[]
+/** One Group/Part row in the Chart tab (Home_Chart_SRS §6.2). */
+export interface ChartEntity {
+  name: string
+  approvedSkills: number
+  /** null when no approved-in-window skill of the entity has a rating. */
+  avgRating: number | null
+  totalViews: number
+  totalDownloads: number
+  activeUsers: number
+  newUsers: number
+}
+
+/** Chart tab data (Home_Chart_SRS §6.2). */
+export interface ChartStats {
+  period: string
+  dimension: string
+  group: string | null
+  entities: ChartEntity[]
 }

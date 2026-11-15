@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PrismDialog from '@/design-system/components/PrismDialog.vue'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismInput from '@/design-system/components/PrismInput.vue'
@@ -7,20 +7,52 @@ import PrismCombobox from '@/design-system/components/PrismCombobox.vue'
 import PrismAlert from '@/design-system/components/PrismAlert.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import TaxonomyChipSelect from './TaxonomyChipSelect.vue'
+import CoworkUserSelect from './CoworkUserSelect.vue'
 import { skillApi } from '@/features/skills/api'
+import { useMcpListStore } from '@/features/mcp/store'
 import { toUserError } from '@/lib/api'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { useI18nStore } from '@/stores/i18n'
 import type { TaxonomyOption } from '@/features/skills/types'
+import McpDependencySection from '@/features/mcp/views/McpDependencySection.vue'
+import type { McpDependencyRow } from '@/features/mcp/views/McpDependencySection.vue'
+import AddMcpPopup from '@/features/mcp/views/AddMcpPopup.vue'
+import BrowseAllMcpPopup from '@/features/mcp/views/BrowseAllMcpPopup.vue'
+import type { McpDetailResponse } from '@/features/mcp/types'
 
-const props = defineProps<{ open: boolean }>()
+const props = withDefaults(defineProps<{
+  open: boolean
+  /** Show the Cowork user selector (Skill Management). */
+  showCowork?: boolean
+  /** Require at least one file (Skill Management). */
+  filesRequired?: boolean
+  /** i18n key for the dialog title. */
+  titleKey?: string
+  /** i18n key for the save button label. */
+  saveLabelKey?: string
+  /** i18n key for the info hint at the bottom. */
+  hintKey?: string
+  /** i18n key for the success toast. */
+  successKey?: string
+}>(), {
+  showCowork: true,
+  filesRequired: true,
+  titleKey: 'app.skills.addTitle',
+  saveLabelKey: 'app.common.save',
+  hintKey: 'app.skills.draftHint',
+  successKey: 'app.skills.createdToast',
+})
 const emit = defineEmits(['update:open', 'saved'])
+const { t } = useI18nStore()
+const mcpList = useMcpListStore()
 
-const SCOPE_OPTIONS = [
-  { label: 'Private', value: 'PRIVATE' },
-  { label: 'Part', value: 'PART' },
-  { label: 'Group', value: 'GROUP' },
-  { label: 'Public', value: 'PUBLIC' },
-]
+const SCOPE_OPTIONS = computed(() => [
+  { label: t('app.skill.scopePrivate'), value: 'PRIVATE' },
+  { label: t('app.skill.scopeProject'), value: 'PROJECT' },
+  { label: t('app.skill.scopePart'), value: 'PART' },
+  { label: t('app.skill.scopeGroup'), value: 'GROUP' },
+  { label: t('app.skill.scopePublic'), value: 'PUBLIC' },
+])
 const HASHTAG_PATTERN = /^[A-Za-z0-9_-]+$/
 const MAX_HASHTAGS = 10
 const MAX_HASHTAG_LENGTH = 30
@@ -29,10 +61,13 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 const name = ref('')
 const scope = ref('PRIVATE')
+const systemKey = ref('')
+const subSystemCode = ref('')
 const description = ref('')
 const hashtags = ref<string[]>([])
 const categoryIds = ref<number[]>([])
 const stageIds = ref<number[]>([])
+const coworkUsers = ref<{ id: number; name: string }[]>([])
 const files = ref<File[]>([])
 const tagInput = ref('')
 const saving = ref(false)
@@ -40,23 +75,76 @@ const nameError = ref('')
 const categoryError = ref('')
 const stageError = ref('')
 const fileError = ref('')
+const mcpError = ref('')
+const descError = ref('')
 const confirmCancel = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const mcpDependencies = ref<McpDependencyRow[]>([])
+const mcpSectionRef = ref<InstanceType<typeof McpDependencySection> | null>(null)
+const showAddMcpPopup = ref(false)
+// v1.27 (FR-MCP-021): Browse All MCPs Popup — opened from the "Browse all
+// MCPs" link in the MCP Dependencies dropdown.
+const showBrowsePopup = ref(false)
 
 const categories = ref<TaxonomyOption[]>([])
 const stages = ref<TaxonomyOption[]>([])
+const mySystems = ref<{ systemKey: string; systemName: string }[]>([])
+const subSystems = ref<{ subSystemCode: string; subSystemName: string }[]>([])
+
+const systemOptions = computed(() =>
+  mySystems.value.map((s) => ({ label: s.systemName, value: s.systemKey }))
+)
+const subSystemOptions = computed(() =>
+  subSystems.value.map((s) => ({ label: s.subSystemName, value: s.subSystemCode }))
+)
 
 async function loadTaxonomy() {
   try {
-    const t = await skillApi.taxonomy()
-    categories.value = t.categories
-    stages.value = t.stages
+    const taxonomy = await skillApi.taxonomy()
+    categories.value = taxonomy.categories
+    stages.value = taxonomy.stages
   } catch {
     // non-fatal
   }
 }
 
-onMounted(loadTaxonomy)
+async function loadMySystems() {
+  try {
+    mySystems.value = await skillApi.mySystems()
+  } catch {
+    mySystems.value = []
+  }
+}
+
+async function loadSubSystems() {
+  if (!systemKey.value) {
+    subSystems.value = []
+    return
+  }
+  try {
+    subSystems.value = await skillApi.subSystems(systemKey.value)
+  } catch {
+    subSystems.value = []
+  }
+}
+
+watch(scope, () => {
+  if (!mySystems.value.length) loadMySystems()
+})
+
+watch(systemKey, (v, old) => {
+  subSystemCode.value = ''
+  if (v && v !== old) {
+    loadSubSystems()
+  } else {
+    subSystems.value = []
+  }
+})
+
+onMounted(() => {
+  loadTaxonomy()
+  loadMySystems()
+})
 
 function fileInputClick() {
   fileInputRef.value?.click()
@@ -72,23 +160,31 @@ function formDirty() {
     hashtags.value.length > 0 ||
     categoryIds.value.length > 0 ||
     stageIds.value.length > 0 ||
-    files.value.length > 0
+    coworkUsers.value.length > 0 ||
+    files.value.length > 0 ||
+    mcpDependencies.value.length > 0
   )
 }
 
 function resetForm() {
   name.value = ''
   scope.value = 'PRIVATE'
+  systemKey.value = ''
+  subSystemCode.value = ''
+  subSystems.value = []
   description.value = ''
   hashtags.value = []
   categoryIds.value = []
   stageIds.value = []
+  coworkUsers.value = []
   tagInput.value = ''
   files.value = []
   nameError.value = ''
   categoryError.value = ''
   stageError.value = ''
   fileError.value = ''
+  mcpError.value = ''
+  mcpDependencies.value = []
 }
 
 watch(
@@ -101,24 +197,73 @@ watch(
   }
 )
 
+// Clear the required-field error as soon as the user adds a dependency
+watch(mcpDependencies, (rows) => {
+  if (rows.length) mcpError.value = ''
+})
+
+// v1.25 (Q-18 exception) + v1.27: refresh MCP dependency section after the
+// Add MCP popup closes (a new MCP may be pinnable) and on tab focus (30s
+// throttle inside refresh — Q-30 pattern), so chip status colors stay current.
+function onAddMcpPopupClosed() {
+  showAddMcpPopup.value = false
+  mcpSectionRef.value?.refresh()
+}
+
+// v1.27 (FR-MCP-021, AC-MCP-072): after Save Draft from the Register popup
+// (opened via Browse's "Add new MCP") → force-refresh suggestions (new MCP
+// may match the fuzzy match) + Browse popup reopens (the new DRAFT MCP is
+// findable there — Q-18 exception).
+function onAddMcpPopupSaved() {
+  showAddMcpPopup.value = false
+  mcpList.markDirty()
+  mcpSectionRef.value?.refresh(true)
+  showBrowsePopup.value = true
+}
+
+// v1.27 (FR-MCP-021): Browse All MCPs Popup handlers.
+// 2026-11-05: multi-select — OK emits an array of selected MCP details.
+// 2026-11-06: single batch emit (stale-props fix).
+function onBrowseSelected(details: McpDetailResponse[]) {
+  showBrowsePopup.value = false
+  mcpSectionRef.value?.addMcpsFromDetails(details)
+}
+function onBrowseAddNewMcp() {
+  showBrowsePopup.value = false
+  showAddMcpPopup.value = true
+}
+
+function onMcpVisibilityChange() {
+  if (props.open && document.visibilityState === 'visible') {
+    mcpSectionRef.value?.refresh()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onMcpVisibilityChange)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onMcpVisibilityChange)
+})
+
 function addTag() {
   const raw = tagInput.value.trim().replace(/^#/, '')
   tagInput.value = ''
   if (!raw) return
   if (raw.length > MAX_HASHTAG_LENGTH) {
-    toastError('Hashtag is at most 30 characters.')
+    toastError(t('app.common.hashtagTooLong'))
     return
   }
   if (!HASHTAG_PATTERN.test(raw)) {
-    toastError('Hashtag contains only letters, digits, "-" and "_".')
+    toastError(t('app.common.hashtagInvalidChars'))
     return
   }
   if (hashtags.value.length >= MAX_HASHTAGS) {
-    toastError('Maximum 10 hashtags.')
+    toastError(t('app.common.hashtagMax'))
     return
   }
-  if (hashtags.value.some((t) => t.toLowerCase() === raw.toLowerCase())) {
-    toastError('Hashtag already exists.')
+  if (hashtags.value.some((h) => h.toLowerCase() === raw.toLowerCase())) {
+    toastError(t('app.common.hashtagExists'))
     return
   }
   hashtags.value = [...hashtags.value, raw]
@@ -155,11 +300,11 @@ function acceptFile(selected: File) {
   const dot = selected.name.lastIndexOf('.')
   const ext = dot >= 0 ? selected.name.slice(dot).toLowerCase() : ''
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    fileError.value = `"${selected.name}": file format is not supported.`
+    fileError.value = t('app.common.fileFormatError', { name: selected.name })
     return
   }
   if (selected.size > MAX_FILE_SIZE) {
-    fileError.value = `"${selected.name}": file size is at most 10MB.`
+    fileError.value = t('app.common.fileSizeError10', { name: selected.name })
     return
   }
   fileError.value = ''
@@ -181,25 +326,39 @@ function validate(): boolean {
   nameError.value = ''
   categoryError.value = ''
   stageError.value = ''
+  mcpError.value = ''
+  descError.value = ''
+  // Fields sit inside a scrollable popup while Save is in the footer — a
+  // field error alone is easy to miss → toast the first failing message.
   if (!name.value.trim()) {
-    nameError.value = 'Skill name cannot be empty.'
+    nameError.value = t('app.common.skillNameEmpty')
+    toastError(t('app.common.skillNameEmpty'))
     return false
   }
   if (name.value.length > 100) {
-    nameError.value = 'Skill name is at most 100 characters.'
+    nameError.value = t('app.common.skillNameTooLong')
+    toastError(t('app.common.skillNameTooLong'))
+    return false
+  }
+  if (!description.value.trim()) {
+    descError.value = t('app.mcp.descRequired')
+    toastError(t('app.mcp.descRequired'))
     return false
   }
   if (!categoryIds.value.length) {
-    categoryError.value = 'Select at least one category.'
+    categoryError.value = t('app.common.selectCategory')
+    toastError(t('app.common.selectCategory'))
     return false
   }
   if (!stageIds.value.length) {
-    stageError.value = 'Select at least one process stage.'
+    stageError.value = t('app.common.selectStage')
+    toastError(t('app.common.selectStage'))
     return false
   }
   fileError.value = ''
-  if (!files.value.length) {
-    fileError.value = 'At least one file is required.'
+  if (props.filesRequired && !files.value.length) {
+    fileError.value = t('app.skills.fileRequired')
+    toastError(t('app.skills.fileRequired'))
     return false
   }
   return true
@@ -209,17 +368,23 @@ async function save() {
   if (!validate()) return
   saving.value = true
   try {
-    await skillApi.create({
+    const skillId = await skillApi.create({
       name: name.value.trim(),
       description: description.value.trim() || undefined,
       publicScope: scope.value,
+      systemKey: systemKey.value || undefined,
+      subSystemCode: systemKey.value ? subSystemCode.value || undefined : undefined,
       hashtags: hashtags.value,
       categoryIds: categoryIds.value,
       stageIds: stageIds.value,
+      coworkUserIds: props.showCowork && coworkUsers.value.length ? coworkUsers.value.map((u) => u.id) : undefined,
       files: files.value.length ? files.value : undefined,
+      mcpDependencies: mcpDependencies.value.length ? mcpDependencies.value.map(d => ({
+        mcpId: d.mcpId, mcpVersion: d.mcpVersion,
+      })) : undefined,
     })
-    toastSuccess('Skill created successfully.')
-    emit('saved')
+    toastSuccess(t(props.successKey))
+    emit('saved', skillId, name.value.trim())
     emit('update:open', false)
   } catch (err) {
     toastError(toUserError(err).message)
@@ -246,8 +411,9 @@ function confirmDiscard() {
 <template>
   <PrismDialog
     :model-value="open"
-    title="Register new skill"
+    :title="t(props.titleKey)"
     size="lg"
+    dialog-class="skill-form-dialog"
     :close-on-overlay="false"
     :close-on-escape="false"
     @update:model-value="requestClose"
@@ -256,66 +422,98 @@ function confirmDiscard() {
     <div class="add">
       <PrismInput
         v-model="name"
-        label="Skill name"
+        :label="t('app.common.skillName')"
         required
-        placeholder="Enter skill name..."
+        :placeholder="t('app.common.skillNamePh')"
         :error="nameError"
         :maxlength="100"
       >
         <template #suffix>
-          <small class="add-count" :class="{ 'is-warn': nameCountWarn }">{{ nameCount }}/100</small>
+          <small class="add-count" :class="{ 'is-warn': nameCountWarn }">{{ t('app.common.charCount', { count: nameCount, max: 100 }) }}</small>
         </template>
       </PrismInput>
 
-      <PrismCombobox v-model="scope" label="Visibility scope" required :options="SCOPE_OPTIONS" />
+      <!-- FR-MCP-014: MCP Dependencies section (right under Skill Name — Q-12) -->
+      <McpDependencySection
+        ref="mcpSectionRef"
+        v-model="mcpDependencies"
+        :error="mcpError"
+        @open-browse="showBrowsePopup = true"
+      />
+
+      <PrismCombobox v-model="scope" :label="t('app.common.visibilityScope')" required :options="SCOPE_OPTIONS" />
+
+      <div class="add-row">
+        <PrismCombobox
+          v-model="systemKey"
+          :label="t('app.skill.formSystem')"
+          :options="systemOptions"
+          :placeholder="t('app.skill.formSystemOptional')"
+        />
+        <PrismCombobox
+          v-model="subSystemCode"
+          :label="t('app.skill.formSubSystem')"
+          :options="subSystemOptions"
+          :disabled="!systemKey"
+          :placeholder="t('app.skill.formSubSystemOptional')"
+        />
+      </div>
+      <CoworkUserSelect
+        v-if="showCowork"
+        v-model="coworkUsers"
+        :label="t('app.common.cowork')"
+        :hint="t('app.common.coworkHint')"
+      />
 
       <TaxonomyChipSelect
         v-model="categoryIds"
-        label="Category"
+        :label="t('app.common.category')"
         required
         tone="category"
         :options="categories"
         :error="categoryError"
-        hint="A skill can belong to several categories."
+        :hint="t('app.common.categoryHint')"
       />
 
       <TaxonomyChipSelect
         v-model="stageIds"
-        label="Process Stage"
+        :label="t('app.common.processStage')"
         required
         tone="stage"
         :options="stages"
         :error="stageError"
-        hint="Pick every stage this skill applies to."
+        :hint="t('app.common.processStageHint')"
       />
 
       <div class="add-desc">
         <RichTextEditor
           v-model="description"
-          label="Description"
-          placeholder="Enter skill description..."
+          :label="t('app.common.description')"
+          :placeholder="t('app.common.skillDescPh')"
           :rows="4"
+          required
         />
+        <p v-if="descError" class="p-field-error" role="alert">{{ descError }}</p>
       </div>
 
       <div class="add-field">
-        <label class="p-label">Hashtag</label>
-        <div class="add-tags" role="group" aria-label="Hashtags">
+        <label class="p-label">{{ t('app.common.hashtag') }}</label>
+        <div class="add-tags" role="group" :aria-label="t('app.common.hashtags')">
           <span v-for="(tag, i) in hashtags" :key="tag" class="add-tag">
             #{{ tag }}
-            <button type="button" class="add-tag-remove" aria-label="Remove hashtag" @click="removeTag(i)">×</button>
+            <button type="button" class="add-tag-remove" :aria-label="t('app.common.removeHashtag')" @click="removeTag(i)">×</button>
           </span>
           <input
             v-model="tagInput"
             class="add-tag-input"
-            placeholder="Type a hashtag and press Enter..."
+            :placeholder="t('app.common.typeHashtagPh')"
             @keydown="onTagKeydown"
           />
         </div>
       </div>
 
       <div class="add-field">
-        <label class="p-label">Files <span class="p-required" aria-hidden="true">*</span></label>
+        <label class="p-label">{{ t('app.common.files') }}<template v-if="filesRequired"> <span class="p-required" aria-hidden="true">*</span></template></label>
         <input
           ref="fileInputRef"
           type="file"
@@ -327,7 +525,7 @@ function confirmDiscard() {
         <div v-if="files.length" class="add-file-list">
           <div v-for="(f, i) in files" :key="i" class="add-file-row">
             <span class="add-file-name" :title="f.name">📄 {{ f.name }} ({{ formatSize(f.size) }})</span>
-            <button type="button" class="add-file-remove" aria-label="Remove file" @click="removeFile(i)">×</button>
+            <button type="button" class="add-file-remove" :aria-label="t('app.common.removeFile')" @click="removeFile(i)">×</button>
           </div>
         </div>
         <div
@@ -336,35 +534,49 @@ function confirmDiscard() {
           @drop.prevent="onDrop"
         >
           <button type="button" class="add-file-drop-btn" @click="fileInputClick">
-            Drag &amp; drop files here or <span class="add-file-link">click to browse</span>
+            {{ t('app.common.dragDropOr') }} <span class="add-file-link">{{ t('app.common.clickToBrowse') }}</span>
           </button>
-          <small class="add-file-meta">Supported: .zip, .7z, .json, .yaml, .yml, .txt, .md, .py, .js, .ts · max 10MB each</small>
+          <small class="add-file-meta">{{ t('app.common.supportedSkillFiles') }}</small>
         </div>
         <p v-if="fileError" class="p-field-error" role="alert">{{ fileError }}</p>
       </div>
 
       <PrismAlert tone="info">
-        The skill is created in Draft status. You can edit it and submit for review when ready.
+        {{ t(props.hintKey) }}
       </PrismAlert>
     </div>
 
     <template #footer>
-      <PrismButton variant="secondary" :disabled="saving" @click="requestClose">Cancel</PrismButton>
-      <PrismButton :loading="saving" @click="save">Save</PrismButton>
+      <PrismButton variant="secondary" :disabled="saving" @click="requestClose">{{ t('app.common.cancel') }}</PrismButton>
+      <PrismButton :loading="saving" @click="save">{{ t(props.saveLabelKey) }}</PrismButton>
     </template>
   </PrismDialog>
 
+  <!-- FR-MCP-021 (v1.27): Browse All MCPs Popup — opened from the
+       "Browse all MCPs" link in the MCP Dependencies dropdown. -->
+  <BrowseAllMcpPopup
+    v-if="showBrowsePopup"
+    ref="browsePopupRef"
+    :pinned-mcp-ids="mcpDependencies.map((d) => d.mcpId)"
+    @close="showBrowsePopup = false"
+    @add-new-mcp="onBrowseAddNewMcp"
+    @selected="onBrowseSelected"
+  />
+
+  <!-- FR-MCP-004: Add MCP Popup — opened from "Add new MCP" in the Browse popup -->
+  <AddMcpPopup v-if="showAddMcpPopup" :open="true" @update:open="onAddMcpPopupClosed" @saved="onAddMcpPopupSaved" />
+
   <PrismDialog
     :model-value="confirmCancel"
-    title="Discard changes?"
+    :title="t('app.common.discardTitle')"
     size="sm"
     :close-on-overlay="false"
     @update:model-value="confirmCancel = $event"
   >
-    <p class="add-confirm-text">Are you sure you want to cancel? The information you entered will not be saved.</p>
+    <p class="add-confirm-text">{{ t('app.common.discardDescChanges') }}</p>
     <template #footer>
-      <PrismButton variant="secondary" @click="confirmCancel = false">Keep editing</PrismButton>
-      <PrismButton @click="confirmDiscard">Discard</PrismButton>
+      <PrismButton variant="secondary" @click="confirmCancel = false">{{ t('app.common.keepEditing') }}</PrismButton>
+      <PrismButton @click="confirmDiscard">{{ t('app.common.discard') }}</PrismButton>
     </template>
   </PrismDialog>
 </template>
@@ -372,6 +584,11 @@ function confirmDiscard() {
 <style scoped>
 .add {
   display: grid;
+  gap: var(--ds-space-4);
+}
+.add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--ds-space-4);
 }
 .add-count {
@@ -385,7 +602,6 @@ function confirmDiscard() {
 .add-desc {
   display: grid;
   gap: var(--ds-space-1);
-  justify-items: start;
 }
 .add-field {
   display: grid;

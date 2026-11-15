@@ -1,0 +1,47 @@
+/* One continuous character rig: one texture, four articulated parts. */
+.robot-viewport{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;opacity:0;transition:opacity .35s ease-out}
+/* The 2D sprite rig is only a WebGL fallback — hide it from the first paint
+   so the user never sees it "pop" into the 3D robot on load. robot-3d.js
+   adds .no-3d when the WebGL context cannot be created (or is lost). */
+.robot-turn{visibility:hidden}
+.robot.no-3d>.robot-turn{visibility:visible}
+.robot.has-3d>.robot-viewport{opacity:1}
+.robot-rig,.robot-turn,.robot-head,.skeleton-torso,.robot-arm,.robot-arm-left{position:absolute;inset:0;display:block;pointer-events:none;will-change:transform}
+.robot-rig{transform-origin:50% 51%}
+.robot-turn{transform-origin:50% 56%}
+.robot-head{transform-origin:50% 51%;clip-path:url(#rig-head);z-index:3}
+.skeleton-torso{transform-origin:50% 55%;clip-path:url(#rig-torso)}
+.robot-arm{transform-origin:68% 60%;clip-path:url(#rig-arm-right);z-index:2}
+.robot-arm-left{transform-origin:37% 56%;clip-path:url(#rig-arm-left);z-index:2}
+.robot .robot-body,.robot-rig img{object-fit:fill;clip-path:none}
+.robot-float{animation:none!important}
+.robot-rig img{animation:none!important;filter:drop-shadow(0 0 4px rgb(103 232 249 / .13))}
+.rig-defs{position:absolute;width:0;height:0;overflow:hidden}
+.neck-joint{position:absolute;left:43%;top:49.5%;width:16%;height:4%;border-radius:50%;background:linear-gradient(#423196,#ac9fe9);z-index:1;pointer-events:none}
+.part-tint{position:absolute;inset:0;background:#ff58da;mix-blend-mode:color;opacity:var(--warm-light,0);mask-image:url('assets/robot-right.png');mask-size:100% 100%;mask-repeat:no-repeat;pointer-events:none}
+/* The Home banner is a short, wide strip (~1408x125). The robot canvas is
+   kept narrow/tall (16%x92%) so the settled z-scale stays high (~0.42): the
+   3D arm's forward pixel reach is proportional to z, and at the wide
+   26%x86% canvas (z~0.30) the arm could not extend forward-left without
+   the pen missing the text. */
+.robot-position{left:64%;top:7%;width:16%;height:92%}
+.robot-travel{position:relative;width:100%;height:100%;transform-origin:50% 50%;will-change:transform}
+.robot-travel[data-side="left"] .speech{right:auto;left:85%;border-radius:16px 16px 16px 3px}
+.robot-head .eye-glint{width:2.2%;box-shadow:0 0 5px 1px #39f2ff,0 0 10px #3be7ff;transition:width .3s,background .3s,opacity .3s}
+.robot-head .eye-left{left:51%;top:35.6%}.robot-head .eye-right{left:69.6%;top:34.3%}
+.eye-brow{position:absolute;width:9%;height:3.5%;border-top:2px solid #9bffff;border-radius:50%;opacity:0;filter:drop-shadow(0 0 3px #54eaff);transition:opacity .4s,transform .4s;pointer-events:none}
+.brow-left{left:47%;top:28%;transform:rotate(-8deg)}.brow-right{left:66%;top:27%;transform:rotate(8deg)}
+.robot-head .cheek-left{left:47%;top:43%}.robot-head .cheek-right{left:66%;top:41.5%}
+.eye-lid{position:absolute;border-radius:50%;background:linear-gradient(135deg,#35149b,#520ed5);pointer-events:none;opacity:var(--blink,0);transform:scaleY(var(--blink,0));z-index:2}
+.lid-left{left:45.5%;top:29.5%;width:13%;height:14%}.lid-right{left:66%;top:28.5%;width:9.5%;height:13.8%;rotate:12deg}
+.eye-lid::after{content:'';position:absolute;left:8%;right:8%;top:48%;height:1px;border-radius:50%;background:#88faff;box-shadow:0 0 3px #4cfaff}
+.ai-banner[data-emotion="curious"] .brow-right{opacity:.6;transform:translateY(-20%) rotate(-12deg)}
+.ai-banner[data-emotion="surprised"] .eye-brow{opacity:.9;transform:translateY(-45%)}
+.ai-banner[data-emotion="surprised"] .eye-glint{width:3.5%;background:#e7ffff}
+.ai-banner[data-emotion="affectionate"] .eye-glint{width:5%;margin-left:-1.3%;margin-top:-1%;background:#ffadf0;clip-path:polygon(50% 92%,5% 46%,0 25%,13% 8%,32% 6%,50% 24%,68% 6%,87% 8%,100% 25%,95% 46%)}
+.ai-banner[data-emotion="playful"] .eye-glint,.ai-banner[data-emotion="excited"] .eye-glint{width:4.5%;margin-left:-1%;margin-top:-1%;background:#c9ffff;clip-path:polygon(50% 0,62% 35%,100% 50%,62% 65%,50% 100%,38% 65%,0 50%,38% 35%)}
+.ai-banner[data-emotion="affectionate"] .cheek,.ai-banner[data-emotion="playful"] .cheek{opacity:.5}
+.ai-banner[data-emotion="dreamy"] .neon-halo{opacity:.3}
+.ai-banner.sleeping .robot-rig{opacity:.85}
+@media(prefers-reduced-motion:reduce){.robot-rig,.robot-travel,.robot-turn,.robot-head,.skeleton-torso,.robot-arm,.robot-arm-left{will-change:auto}}
+@media(max-width:700px){.robot-position{left:35%;top:9%;width:53%;height:77%}}

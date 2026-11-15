@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { useEditor, EditorContent, VueRenderer } from '@tiptap/vue-3'
 import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -13,8 +13,17 @@ import TextAlign from '@tiptap/extension-text-align'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Image from '@tiptap/extension-image'
+import Mention from '@tiptap/extension-mention'
+import MentionSuggestionList from '@/components/MentionSuggestionList.vue'
 import PrismFormField from '@/design-system/components/PrismFormField.vue'
-import { useId } from 'vue'
+import { useI18nStore } from '@/stores/i18n'
+
+const { t } = useI18nStore()
+
+export interface MentionSuggestionItem {
+  id: number
+  name: string
+}
 
 const props = defineProps<{
   modelValue: string
@@ -24,10 +33,19 @@ const props = defineProps<{
   maxLength?: number
   disabled?: boolean
   required?: boolean
+  mentionEnabled?: boolean
+  mentionSuggestion?: (query: string, signal?: AbortSignal) => Promise<MentionSuggestionItem[]>
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const generatedId = useId()
+
+// Mention autocomplete: true while a suggestion query is in flight (drives
+// the "Searching…" row in the dropdown). Monotonic request id so a stale
+// response (superseded by a newer query) does not clear the flag while the
+// newer query is still in flight.
+const mentionLoading = ref(false)
+let mentionReqId = 0
 
 const editor = useEditor({
   content: props.modelValue || '',
@@ -46,6 +64,174 @@ const editor = useEditor({
     Subscript,
     Superscript,
     Image.configure({ allowBase64: true, resize: { enabled: true, minWidth: 40, minHeight: 20 } }),
+    // @mention autocomplete — only active where the parent opts in
+    // (mention-enabled + mention-suggestion, e.g. AI News comments).
+    // The mention renders as <span data-type="mention" data-user-id
+    // data-user-name> which the backend parses for notifications.
+    ...(props.mentionEnabled
+      ? [
+          // Extra `userId` attribute (via extend) so data-user-id survives
+          // Tiptap's re-parse of stored comment HTML — the default node only
+          // parses data-id / data-label, so without this, editing a comment
+          // that contains a mention would drop the id and the backend could
+          // not notify on resubmit.
+          Mention.extend({
+            addAttributes() {
+              return {
+                ...this.parent?.(),
+                userId: {
+                  default: null,
+                  parseHTML: (element: HTMLElement) => element.getAttribute('data-user-id'),
+                  renderHTML: (attributes: Record<string, unknown>) =>
+                    attributes.userId ? { 'data-user-id': String(attributes.userId) } : {},
+                },
+              }
+            },
+          }).configure({
+            HTMLAttributes: { class: 'mention' },
+            // Keep data-type="mention" — the backend parses
+            // span[data-type=mention][data-user-id] for notifications.
+            renderHTML: ({ options, node }) => [
+              'span',
+              {
+                'data-type': 'mention',
+                ...options.HTMLAttributes,
+                'data-user-id': (node.attrs as { userId?: string | null }).userId ?? node.attrs.id ?? '',
+                'data-user-name': node.attrs.label ?? '',
+              },
+              `@${node.attrs.label ?? node.attrs.id ?? ''}`,
+            ],
+            suggestion: {
+              char: '@',
+              allowSpaces: true,
+              debounce: 250,
+              // The dropdown mounts into document.body by default — but a
+              // modal <dialog> sits above body content in the top layer,
+              // so when the editor renders inside one (AI News comment
+              // sidebar) a body-mounted popup is hidden behind the drawer.
+              // The popup is instead pre-attached to the <dialog> in
+              // onStart (see below). The dialog is positioned (top layer),
+              // so it is the popup's offsetParent and the default 'absolute'
+              // strategy resolves correctly against it. Do NOT use
+              // 'fixed' here: the dialog's backdrop-filter makes it the
+              // containing block for fixed descendants, so fixed
+              // (viewport-relative) coordinates would be offset by the
+              // dialog's position. The popup is a sibling of
+              // .p-dialog-body, so the body's overflow-y:auto doesn't
+              // clip it.
+              items: ({ query, signal }) => {
+                const reqId = ++mentionReqId
+                mentionLoading.value = true
+                return (props.mentionSuggestion
+                  ? props.mentionSuggestion(query, signal)
+                  : Promise.resolve([])
+                )
+                  .then((users) => users.map((u) => ({ id: String(u.id), label: u.name })))
+                  .finally(() => {
+                    // Only clear the flag if this is still the latest query —
+                    // an aborted/superseded response must not hide the
+                    // "Searching…" state of the newer one.
+                    if (reqId === mentionReqId) mentionLoading.value = false
+                  })
+              },
+              render: () => {
+                let component: VueRenderer | null = null
+                let unmount: (() => void) | null = null
+                // The dropdown's item shape (MentionSuggestionList): the
+                // suggestion's command/items are MentionNodeAttrs-shaped
+                // (id/label as strings), not the API's MentionUser (id: number).
+                type MentionListItem = { id: string; label: string }
+                let items: MentionListItem[] = []
+                let command: (item: MentionListItem) => void = () => {}
+                // Keyboard selection index (renderer-level — the dropdown is
+                // mounted OUTSIDE the editor DOM, so keydown never reaches
+                // it; the Suggestion plugin routes keys here via the
+                // renderer's onKeyDown hook).
+                let selected = 0
+                const setSelected = (i: number) => {
+                  selected = i
+                  component?.updateProps({ selected: i })
+                }
+                return {
+                  onStart: (props) => {
+                    items = props.items
+                    command = props.command
+                    selected = 0
+                    component = new VueRenderer(MentionSuggestionList, {
+                      props: {
+                        items: props.items,
+                        command: props.command,
+                        loading: mentionLoading.value,
+                        selected: 0,
+                        onHover: setSelected,
+                      },
+                      editor: props.editor,
+                    })
+                    if (component.element instanceof HTMLElement) {
+                      // Pre-attach the element to the nearest <dialog> when
+                      // the editor renders inside one (AI News comment
+                      // sidebar) — the plugin's mount() skips re-appending
+                      // already-connected elements, so it keeps positioning
+                      // this element here instead of document.body (which
+                      // a modal <dialog> covers in the top layer).
+                      const dialog = props.editor.view.dom.closest('dialog')
+                      if (dialog) dialog.appendChild(component.element)
+                      unmount = props.mount(component.element)
+                    }
+                  },
+                  onUpdate: (props) => {
+                    items = props.items
+                    command = props.command
+                    if (selected >= items.length) selected = 0
+                    component?.updateProps({
+                      items: props.items,
+                      command: props.command,
+                      loading: mentionLoading.value,
+                      selected,
+                      onHover: setSelected,
+                    })
+                  },
+                  // ArrowUp/Down move the selection, Enter/Tab insert the
+                  // selected user. Without this hook the dropdown was
+                  // click-only: Enter inserted a paragraph and the arrow
+                  // keys did nothing (the plugin only forwards keys to the
+                  // renderer's onKeyDown).
+                  onKeyDown: ({ event }) => {
+                    if (items.length === 0) return false
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault()
+                      setSelected((selected + 1) % items.length)
+                      return true
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault()
+                      setSelected((selected - 1 + items.length) % items.length)
+                      return true
+                    }
+                    if (event.key === 'Enter' || event.key === 'Tab') {
+                      const item = items[selected]
+                      if (item) {
+                        event.preventDefault()
+                        command(item)
+                        return true
+                      }
+                    }
+                    return false
+                  },
+                  onExit: () => {
+                    unmount?.()
+                    component?.destroy()
+                    component = null
+                    unmount = null
+                    items = []
+                    selected = 0
+                  },
+                }
+              },
+            },
+          }),
+        ]
+      : []),
   ],
   editorProps: {
     attributes: {
@@ -58,12 +244,17 @@ const editor = useEditor({
   },
 })
 
-// external value changes (e.g. form reset) → sync into editor
+// external value changes (e.g. form reset) → sync into editor.
+// When the editor is focused, the change came from THIS editor's own
+// onUpdate (the model round-trips back) — re-parsing would reset the caret
+// on every keystroke. It also guards the twin-instance case (main pane +
+// drawer bound to the same model): only the unfocused instance re-parses.
 watch(
   () => props.modelValue,
   (val) => {
     const e = editor.value
     if (!e) return
+    if (e.isFocused) return
     const current = e.isEmpty ? '' : e.getHTML()
     if (val !== current) e.commands.setContent(val || '', { emitUpdate: false })
   },
@@ -75,6 +266,12 @@ onBeforeUnmount(() => {
 
 function active(cmd: 'bold' | 'italic' | 'underline' | 'strike' | 'bulletList' | 'orderedList' | 'taskList' | 'blockquote' | 'codeBlock' | 'subscript' | 'superscript' | 'highlight') {
   return editor.value?.isActive(cmd) ?? false
+}
+
+/** Focus the editor (exposed for parents — e.g. auto-focus when a reply
+    form opens). */
+function focus() {
+  editor.value?.chain().focus().run()
 }
 
 function run(cmd: 'bold' | 'italic' | 'underline' | 'strike' | 'bulletList' | 'orderedList' | 'taskList' | 'blockquote' | 'codeBlock' | 'subscript' | 'superscript' | 'highlight') {
@@ -118,7 +315,7 @@ function setLink() {
     e.chain().focus().unsetLink().run()
     return
   }
-  const url = window.prompt('Link URL (https://...)', 'https://')
+  const url = window.prompt(t('app.rte.linkPrompt'), 'https://')
   if (url && /^https?:\/\//i.test(url)) {
     e.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }
@@ -191,11 +388,11 @@ async function onImagePicked(ev: Event) {
   if (!file) return
   const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
   if (!IMAGE_ALLOWED.includes(ext)) {
-    window.alert('Unsupported image type. Allowed: .jpg, .jpeg, .png, .webp')
+    window.alert(t('app.rte.unsupportedImage'))
     return
   }
   if (file.size > IMAGE_MAX_SIZE) {
-    window.alert('Image too large. Maximum size is 5MB.')
+    window.alert(t('app.rte.imageTooLarge'))
     return
   }
   let dataUri: string
@@ -205,7 +402,7 @@ async function onImagePicked(ev: Event) {
       ? await readAsDataUrl(file)
       : await compressImage(file)
   } catch {
-    window.alert('Could not process the image. Please try a different file.')
+    window.alert(t('app.rte.imageProcessError'))
     return
   }
   if (dataUri) editor.value?.chain().focus().setImage({ src: dataUri, alt: file.name }).run()
@@ -243,6 +440,23 @@ const isTable = computed(() => editor.value?.isActive('table') ?? false)
 const bubbleVisible = ref(false)
 const bubbleEl = ref<HTMLElement | null>(null)
 
+// Editor min-height in em. The two template branches used to default to
+// different values (4 with a label, 3 without) — a silent drift; both now
+// share this single default.
+const effectiveRows = computed(() => props.rows ?? 4)
+
+const charCount = computed(() => {
+  const e = editor.value
+  if (!e) return 0
+  return e.getText().replace(/\n$/, '').length
+})
+const overLimit = computed(() => props.maxLength != null && charCount.value > props.maxLength)
+/** Whether the plain-text length exceeds maxLength (exposed so parents can
+    disable their Send button — the counter alone is display-only). */
+const isOverLimit = computed(() => overLimit.value)
+
+defineExpose({ focus, isOverLimit })
+
 onMounted(() => {
   const e = editor.value
   if (!e || !bubbleEl.value) return
@@ -268,55 +482,62 @@ onMounted(() => {
 </script>
 
 <template>
-  <PrismFormField :id="generatedId" :label="label" :required="required">
+  <!-- Single editor body; the wrapper is PrismFormField when a label is
+       given, a plain div otherwise. The body is defined ONCE (the two
+       branches used to be ~40 lines of duplicated toolbar + bubble menu). -->
+  <component
+    :is="label ? PrismFormField : 'div'"
+    v-bind="label ? { id: generatedId, label, required } : {}"
+  >
     <div class="rte">
-      <div class="rte-toolbar" role="toolbar" aria-label="Text formatting">
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('bold') }" :disabled="disabled" @click="run('bold')" title="Bold"><strong>B</strong></button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('italic') }" :disabled="disabled" @click="run('italic')" title="Italic"><em>I</em></button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('underline') }" :disabled="disabled" @click="run('underline')" title="Underline"><u>U</u></button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('strike') }" :disabled="disabled" @click="run('strike')" title="Strikethrough"><s>S</s></button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('highlight') }" :disabled="disabled" @click="run('highlight')" title="Highlight">🖍</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('subscript') }" :disabled="disabled" @click="run('subscript')" title="Subscript">X<sub>2</sub></button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('superscript') }" :disabled="disabled" @click="run('superscript')" title="Superscript">X<sup>2</sup></button>
+      <div class="rte-toolbar" role="toolbar" :aria-label="t('app.rte.toolbarAria')">
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('bold') }" :disabled="disabled" @click="run('bold')" :title="t('app.rte.bold')"><strong>B</strong></button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('italic') }" :disabled="disabled" @click="run('italic')" :title="t('app.rte.italic')"><em>I</em></button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('underline') }" :disabled="disabled" @click="run('underline')" :title="t('app.rte.underline')"><u>U</u></button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('strike') }" :disabled="disabled" @click="run('strike')" :title="t('app.rte.strikethrough')"><s>S</s></button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('highlight') }" :disabled="disabled" @click="run('highlight')" :title="t('app.rte.highlight')">🖍</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('subscript') }" :disabled="disabled" @click="run('subscript')" :title="t('app.rte.subscript')">X<sub>2</sub></button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('superscript') }" :disabled="disabled" @click="run('superscript')" :title="t('app.rte.superscript')">X<sup>2</sup></button>
         <span class="rte-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isH1 }" :disabled="disabled" @click="setHeading(1)" title="Heading 1">H1</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isH2 }" :disabled="disabled" @click="setHeading(2)" title="Heading 2">H2</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isH3 }" :disabled="disabled" @click="setHeading(3)" title="Heading 3">H3</button>
-        <button type="button" class="rte-btn" :disabled="disabled" @click="setHeading(0)" title="Paragraph">¶</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isH1 }" :disabled="disabled" @click="setHeading(1)" :title="t('app.rte.heading1')">H1</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isH2 }" :disabled="disabled" @click="setHeading(2)" :title="t('app.rte.heading2')">H2</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isH3 }" :disabled="disabled" @click="setHeading(3)" :title="t('app.rte.heading3')">H3</button>
+        <button type="button" class="rte-btn" :disabled="disabled" @click="setHeading(0)" :title="t('app.rte.paragraph')">¶</button>
         <span class="rte-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isAlign('left') }" :disabled="disabled" @click="setAlign('left')" title="Align left">⇤</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isAlign('center') }" :disabled="disabled" @click="setAlign('center')" title="Align center">⇹</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isAlign('right') }" :disabled="disabled" @click="setAlign('right')" title="Align right">⇥</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isAlign('left') }" :disabled="disabled" @click="setAlign('left')" :title="t('app.rte.alignLeft')">⇤</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isAlign('center') }" :disabled="disabled" @click="setAlign('center')" :title="t('app.rte.alignCenter')">⇹</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isAlign('right') }" :disabled="disabled" @click="setAlign('right')" :title="t('app.rte.alignRight')">⇥</button>
         <span class="rte-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('bulletList') }" :disabled="disabled" @click="run('bulletList')" title="Bullet list">•≡</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('orderedList') }" :disabled="disabled" @click="run('orderedList')" title="Numbered list">1≡</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('taskList') }" :disabled="disabled" @click="run('taskList')" title="Task list">☑</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('blockquote') }" :disabled="disabled" @click="run('blockquote')" title="Quote">❝</button>
-        <button type="button" class="rte-btn" :class="{ 'is-active': active('codeBlock') }" :disabled="disabled" @click="run('codeBlock')" title="Code block">&lt;/&gt;</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('bulletList') }" :disabled="disabled" @click="run('bulletList')" :title="t('app.rte.bulletList')">•≡</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('orderedList') }" :disabled="disabled" @click="run('orderedList')" :title="t('app.rte.numberedList')">1≡</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('taskList') }" :disabled="disabled" @click="run('taskList')" :title="t('app.rte.taskList')">☑</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('blockquote') }" :disabled="disabled" @click="run('blockquote')" :title="t('app.rte.quote')">❝</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': active('codeBlock') }" :disabled="disabled" @click="run('codeBlock')" :title="t('app.rte.codeBlock')">&lt;/&gt;</button>
         <span class="rte-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isTable }" :disabled="disabled" @click="insertTable()" title="Insert table">▦</button>
-        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="addRowAfter()" title="Add row below">+☰</button>
-        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="deleteRow()" title="Delete row">☰✕</button>
-        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="addColumnAfter()" title="Add column right">+▥</button>
-        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="deleteColumn()" title="Delete column">▥✕</button>
-        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="deleteTable()" title="Delete table">▦✕</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isTable }" :disabled="disabled" @click="insertTable()" :title="t('app.rte.insertTable')">▦</button>
+        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="addRowAfter()" :title="t('app.rte.addRowBelow')">+☰</button>
+        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="deleteRow()" :title="t('app.rte.deleteRow')">☰✕</button>
+        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="addColumnAfter()" :title="t('app.rte.addColumnRight')">+▥</button>
+        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="deleteColumn()" :title="t('app.rte.deleteColumn')">▥✕</button>
+        <button type="button" class="rte-btn" :disabled="disabled || !isTable" @click="deleteTable()" :title="t('app.rte.deleteTable')">▦✕</button>
         <span class="rte-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-btn" :class="{ 'is-active': isLink }" :disabled="disabled" @click="setLink()" title="Link">🔗</button>
-        <button type="button" class="rte-btn" :disabled="disabled" @click="setImage()" title="Image">🖼</button>
+        <button type="button" class="rte-btn" :class="{ 'is-active': isLink }" :disabled="disabled" @click="setLink()" :title="t('app.rte.link')">🔗</button>
+        <button type="button" class="rte-btn" :disabled="disabled" @click="setImage()" :title="t('app.rte.image')">🖼</button>
       </div>
       <input ref="imageInput" type="file" accept=".jpg,.jpeg,.png,.webp" class="rte-file-input" @change="onImagePicked" tabindex="-1" aria-hidden="true" />
       <div class="rte-content-wrap">
-        <EditorContent :editor="editor" class="rte-content" :style="{ minHeight: `${(rows || 4) * 1.6}em` }" />
+        <EditorContent :editor="editor" class="rte-content" :style="{ minHeight: `${effectiveRows * 1.6}em` }" />
         <div ref="bubbleEl" class="rte-bubble" v-show="bubbleVisible">
-          <button type="button" class="rte-btn" :class="{ 'is-active': active('bold') }" @click="run('bold')" title="Bold"><strong>B</strong></button>
-          <button type="button" class="rte-btn" :class="{ 'is-active': active('italic') }" @click="run('italic')" title="Italic"><em>I</em></button>
-          <button type="button" class="rte-btn" :class="{ 'is-active': active('underline') }" @click="run('underline')" title="Underline"><u>U</u></button>
-          <button type="button" class="rte-btn" :class="{ 'is-active': active('highlight') }" @click="run('highlight')" title="Highlight">🖍</button>
-          <button type="button" class="rte-btn" :class="{ 'is-active': isLink }" @click="setLink()" title="Link">🔗</button>
+          <button type="button" class="rte-btn" :class="{ 'is-active': active('bold') }" @click="run('bold')" :title="t('app.rte.bold')"><strong>B</strong></button>
+          <button type="button" class="rte-btn" :class="{ 'is-active': active('italic') }" @click="run('italic')" :title="t('app.rte.italic')"><em>I</em></button>
+          <button type="button" class="rte-btn" :class="{ 'is-active': active('underline') }" @click="run('underline')" :title="t('app.rte.underline')"><u>U</u></button>
+          <button type="button" class="rte-btn" :class="{ 'is-active': active('highlight') }" @click="run('highlight')" :title="t('app.rte.highlight')">🖍</button>
+          <button type="button" class="rte-btn" :class="{ 'is-active': isLink }" @click="setLink()" :title="t('app.rte.link')">🔗</button>
         </div>
       </div>
+      <div v-if="maxLength != null" class="rte-count" :class="{ 'is-over': overLimit }">{{ t('app.rte.charCounter', { count: charCount, max: maxLength }) }}</div>
     </div>
-  </PrismFormField>
+  </component>
 </template>
 
 <style scoped>
@@ -372,6 +593,15 @@ onMounted(() => {
 }
 .rte-content-wrap {
   position: relative;
+}
+.rte-count {
+  padding: 2px var(--ds-space-3) 6px;
+  text-align: right;
+  font: 11px var(--ds-font-mono);
+  color: var(--ds-color-text-muted);
+}
+.rte-count.is-over {
+  color: var(--ds-color-danger);
 }
 .rte-content {
   padding: var(--ds-space-2) var(--ds-space-3);
@@ -453,6 +683,14 @@ onMounted(() => {
 .rte-content :deep(.ProseMirror a) {
   color: var(--ds-color-accent);
   text-decoration: underline;
+}
+.rte-content :deep(.ProseMirror .mention) {
+  color: var(--ds-color-accent);
+  background: rgb(103 232 249 / .12);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 .rte-content :deep(.ProseMirror mark) {
   background: rgba(250, 204, 21, 0.35);

@@ -8,8 +8,12 @@ import PrismAmbientBackground from '@/design-system/components/PrismAmbientBackg
 import { authApi } from '@/features/auth/api'
 import { toUserError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import { useI18nStore } from '@/stores/i18n'
+import { landingPath } from '@/router'
 
 const auth = useAuthStore()
+const i18n = useI18nStore()
+const { t } = i18n
 const route = useRoute()
 const router = useRouter()
 
@@ -21,14 +25,14 @@ const error = ref('')
 async function onSubmit() {
   error.value = ''
   if (!email.value || !password.value) {
-    error.value = 'Please enter your email and password.'
+    error.value = t('app.auth.loginError')
     return
   }
   loading.value = true
   try {
     const data = await authApi.login(email.value, password.value)
     auth.setSession(data)
-    router.push((route.query.redirect as string) || '/home')
+    router.push((route.query.redirect as string) || landingPath())
   } catch (err) {
     error.value = toUserError(err).message
   } finally {
@@ -41,35 +45,35 @@ async function onSubmit() {
   <div class="auth-page">
     <PrismAmbientBackground />
     <form class="auth-card p-glass" @submit.prevent="onSubmit">
-      <h1 class="auth-brand">AI SKILL MANAGEMENT</h1>
-      <p class="auth-subtitle">Sign in with your email and password</p>
+      <h1 class="auth-brand">{{ t('app.auth.loginTitle') }}</h1>
+      <p class="auth-subtitle">{{ t('app.auth.loginSubtitle') }}</p>
 
       <p v-if="error" class="p-field-error" role="alert">{{ error }}</p>
 
       <PrismInput
         v-model="email"
-        label="Email"
+        :label="t('app.common.email')"
         type="email"
-        placeholder="you@company.com"
+        :placeholder="t('app.common.emailPh')"
         autocomplete="email"
         required
       />
       <PrismPasswordInput
         v-model="password"
-        label="Password"
-        placeholder="Your password"
+        :label="t('app.auth.password')"
+        :placeholder="t('app.auth.passwordPh')"
         autocomplete="current-password"
         required
       />
 
       <div class="auth-links">
-        <RouterLink to="/forgot-password">Forgot password?</RouterLink>
+        <RouterLink to="/forgot-password">{{ t('app.auth.forgotPassword') }}</RouterLink>
       </div>
 
-      <PrismButton type="submit" :loading="loading">Log In</PrismButton>
+      <PrismButton type="submit" :loading="loading">{{ t('app.auth.loginBtn') }}</PrismButton>
 
       <p class="auth-register">
-        Don't have an account? <RouterLink to="/register">Register</RouterLink>
+        {{ t('app.auth.noAccount') }} <RouterLink to="/register">{{ t('app.auth.register') }}</RouterLink>
       </p>
     </form>
   </div>

@@ -6,7 +6,7 @@
 | **Loại** | Sitemap & User Flows (bản đồ màn hình + luồng sử dụng) |
 | **Phiên bản** | 1.2 |
 | **Ngày tạo** | 21/09/2026 |
-| **Cập nhật** | 16/10/2026 — thêm VOC Module, Skill Update Version, Category/Stage filter |
+| **Cập nhật** | 23/10/2026 — thêm Log Module (Audit Log) |
 | **Đối tượng** | PO / BA / UX/UI / Developer / QA / User |
 | **Nguồn** | Tổng hợp từ các SRS trong `AIX-Design-System_ver5/AIX-Design-System/SRS/` |
 
@@ -579,13 +579,17 @@ GNB:
 
 | Luồng | SRS |
 |-------|-----|
-| Login / Register / Forgot Password / OTP / Reset | `SRS/Login_User Register before login_SRS.md` |
-| Home / GNB / Notification bell | `SRS/Home_Screen_SRS.md` |
-| Skill Management (search, grid, permission) | `SRS/Skill_Management_Screen_Spec.md` |
-| Skill Detail Popup | `SRS/Detail_Popup_SRS.md`, `SRS/Detail_Popup_Spec.md` |
-| Add Skill Popup | `SRS/Add_Popup_SRS.md`, `SRS/Add_Popup_Spec.md` |
-| Edit Skill Popup | `SRS/Edit_Popup_SRS.md`, `SRS/Edit_Popup_Spec.md` |
-| User Management | `SRS/User Management Screen_SRS.md` |
-| Settings | `SRS/Settings_SRS.md`, `SRS/Settings_Spec.md` |
+| Login / Register / Forgot Password / OTP / Reset | `SRS/2. User Management Module/Login_User Register before login_SRS.md` |
+| Home / GNB / Notification bell | `SRS/5. Home module/Home_Screen_SRS.md` |
+| Skill Management (search, grid, permission) | `SRS/1. Skill Management module/Skill_Management_Screen_Spec.md` |
+| Skill Detail Popup | `SRS/1. Skill Management module/Detail_Popup_SRS.md`, `SRS/1. Skill Management module/Detail_Popup_Spec.md` |
+| Add Skill Popup | `SRS/1. Skill Management module/Add_Popup_SRS.md`, `SRS/1. Skill Management module/Add_Popup_Spec.md` |
+| Edit Skill Popup | `SRS/1. Skill Management module/Edit_Popup_SRS.md`, `SRS/1. Skill Management module/Edit_Popup_Spec.md` |
+| User Management | `SRS/2. User Management Module/User Management Screen_SRS.md` |
+| Settings | `SRS/2. User Management Module/Settings_SRS.md`, `SRS/2. User Management Module/Settings_Spec.md` |
 | VOC / Feedback | `SRS/3. VOC Module/VOC_Feedback_SRS.md` |
+| Skill Market | `SRS/4. Skill Market Module/Skill_Market_SRS.md` |
+| AI News Screen | `SRS/6. AI News Module/AI_News_Screen_SRS.md` |
+| AI News Batch (import) | `SRS/6. AI News Module/AI_News_Batch.md` |
+| Audit Log (backend, màn admin chưa có) | `SRS/7. Log Module/Log_Module_SRS.md` |
 | Sitemap chi tiết Skill Management (bản cũ) | `Draft/Detailed_Sitemap.md` |
