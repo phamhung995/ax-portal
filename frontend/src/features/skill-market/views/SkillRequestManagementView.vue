@@ -465,8 +465,8 @@ onBeforeUnmount(() => {
 .search-input {
   width: 100%;
   border: 1px solid var(--ds-color-border);
-  background: rgb(16 13 43 / .55);
-  backdrop-filter: blur(8px);
+  /* v2.0 Linear: flat dark input, no purple tint, no blur. */
+  background: rgb(8 9 10 / .55);
   color: var(--ds-color-text-primary);
   font: inherit;
   font-size: 14px;
@@ -481,7 +481,7 @@ onBeforeUnmount(() => {
 }
 .search-input:focus {
   border-color: rgb(94 106 210 / .42);
-  background: rgb(16 13 43 / .72);
+  background: rgb(8 9 10 / .72);
   box-shadow: var(--ds-shadow-glow);
 }
 .search-wrap:focus-within .search-icon {
