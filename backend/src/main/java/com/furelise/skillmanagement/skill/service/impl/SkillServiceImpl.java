@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.furelise.skillmanagement.skill.dto.*;
 import com.furelise.skillmanagement.exception.BusinessErrorCode;
 import com.furelise.skillmanagement.exception.BusinessException;
+import com.furelise.skillmanagement.gamification.service.GamificationService;
+import com.furelise.skillmanagement.reputation.model.ReputationScore;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.mcp.model.SkillMcpDependency;
 import com.furelise.skillmanagement.mcp.service.McpDependencyService;
 import com.furelise.skillmanagement.org.model.OrganizationMaster;
@@ -141,6 +144,8 @@ public class SkillServiceImpl implements SkillService {
     private final com.furelise.skillmanagement.org.repository.SubSystemMasterRepository subSystemMasterRepository;
     private final SkillFileStorageService skillFileStorageService;
     private final RateLimiter rateLimiter;
+    private final ReputationService reputationService;
+    private final GamificationService gamificationService;
     private final ObjectMapper objectMapper;
     private final com.furelise.skillmanagement.user.repository.UserSettingsRepository userSettingsRepository;
     private final com.furelise.skillmanagement.notification.service.EventNotificationService eventNotificationService;
@@ -208,6 +213,9 @@ public class SkillServiceImpl implements SkillService {
                 .createdBy(creator.getId())
                 .build();
         Skill saved = skillRepository.save(skill);
+        // Gamification: publishing a skill earns +50 once per skill.
+        gamificationService.awardPoints(creator.getId(), GamificationService.POINTS_PUBLISH_SKILL,
+                "PUBLISH_SKILL", "Đăng skill mới", "SKILL", saved.getId());
         storeFiles(saved.getId(), files);
         storeCategoryMappings(saved.getId(), categories);
         storeStageMappings(saved.getId(), stages);
@@ -454,6 +462,7 @@ public class SkillServiceImpl implements SkillService {
             case "name" -> "name";
             case "viewcount" -> "viewCount";
             case "avgrating" -> "avgRating";
+            case "reputation" -> "reputation";
             default -> "createdAt";
         };
 
@@ -462,28 +471,41 @@ public class SkillServiceImpl implements SkillService {
                 SkillRepository.visibleTo(viewer, viewerOrg),
                 searchCriteria(request, viewer, true));
 
-        // avgRating has no entity column — sort in memory by the per-skill
-        // rating average (nulls last), then page manually.
+        // avgRating and reputation have no entity column — sort in memory
+        // (rating average / cached reputation score, nulls last), then page manually.
         List<Skill> skills;
         long total;
-        if ("avgRating".equals(sortBy)) {
+        if ("avgRating".equals(sortBy) || "reputation".equals(sortBy)) {
             List<Skill> all = skillRepository.findAll(spec,
                     Sort.by(Sort.Direction.DESC, "createdAt"));
-            Map<Long, Double> avgBySkill = new LinkedHashMap<>();
-            if (!all.isEmpty()) {
-                for (Object[] row : skillRatingRepository.ratingAggBySkillIdIn(
-                        all.stream().map(Skill::getId).toList())) {
-                    avgBySkill.put((Long) row[0], ((Number) row[1]).doubleValue());
+            if ("reputation".equals(sortBy)) {
+                // Cached reputation_scores (null = not enough ratings yet, sorts last).
+                Map<Long, ReputationScore> scores = reputationService.getReputations(
+                        "SKILL", all.stream().map(Skill::getId).toList());
+                Comparator<Skill> byRep = Comparator.comparingDouble(
+                        (Skill s) -> scores.get(s.getId()) != null
+                                && scores.get(s.getId()).getScore() != null
+                                ? scores.get(s.getId()).getScore().doubleValue() : -1.0).reversed();
+                // Same deterministic tie-break as avgRating (see below).
+                all.sort(byRep.thenComparing(Skill::getCreatedAt,
+                        Comparator.reverseOrder()).thenComparing(Skill::getId));
+            } else {
+                Map<Long, Double> avgBySkill = new LinkedHashMap<>();
+                if (!all.isEmpty()) {
+                    for (Object[] row : skillRatingRepository.ratingAggBySkillIdIn(
+                            all.stream().map(Skill::getId).toList())) {
+                        avgBySkill.put((Long) row[0], ((Number) row[1]).doubleValue());
+                    }
                 }
+                Comparator<Skill> byAvg = Comparator.comparingDouble(
+                        (Skill s) -> avgBySkill.getOrDefault(s.getId(), 0.0)).reversed();
+                // Tie-break on the PK: many skills share the same rating (no
+                // ratings → 0.0) and createdAt, and without a deterministic
+                // order the in-memory page boundaries shift between requests
+                // (the same skill appears on two different pages).
+                all.sort(byAvg.thenComparing(Skill::getCreatedAt,
+                        Comparator.reverseOrder()).thenComparing(Skill::getId));
             }
-            Comparator<Skill> byAvg = Comparator.comparingDouble(
-                    (Skill s) -> avgBySkill.getOrDefault(s.getId(), 0.0)).reversed();
-            // Tie-break on the PK: many skills share the same rating (no
-            // ratings → 0.0) and createdAt, and without a deterministic
-            // order the in-memory page boundaries shift between requests
-            // (the same skill appears on two different pages).
-            all.sort(byAvg.thenComparing(Skill::getCreatedAt,
-                    Comparator.reverseOrder()).thenComparing(Skill::getId));
             total = all.size();
             int from = Math.min((page - 1) * pageSize, all.size());
             int to = Math.min(from + pageSize, all.size());
@@ -502,6 +524,7 @@ public class SkillServiceImpl implements SkillService {
 
         Map<Long, User> creators = loadCreators(skills);
         Map<Long, RatingAgg> ratings = loadRatings(skills);
+        Map<Long, ReputationScore> reputations = loadReputations(skills);
         Set<Long> subscribed = loadSubscribed(skills, viewer.getId());
         Map<Long, List<String>> categoriesBySkill = loadCategoryNames(skills);
         Map<Long, List<String>> stagesBySkill = loadStageNames(skills);
@@ -544,7 +567,10 @@ public class SkillServiceImpl implements SkillService {
                     s.getPendingReason(),
                     pendingShareCounts.getOrDefault(s.getId(), 0L).intValue(),
                     coworkSkillIds.contains(s.getId()),
-                    downloadCounts.getOrDefault(s.getId(), 0L));
+                    downloadCounts.getOrDefault(s.getId(), 0L),
+                    reputations.get(s.getId()) != null && reputations.get(s.getId()).getScore() != null
+                            ? reputations.get(s.getId()).getScore().doubleValue() : null,
+                    reputations.get(s.getId()) != null ? reputations.get(s.getId()).getTier() : "NEW");
         }).toList();
 
         return new SkillSearchResult(total, page, pageSize, items,
@@ -938,6 +964,11 @@ public class SkillServiceImpl implements SkillService {
                 .userId(user.getId())
                 .downloadAll(downloadAll)
                 .build());
+        // Gamification: downloading (installing) a skill earns +5 (daily cap 25).
+        if (downloadAll) {
+            gamificationService.awardPoints(user.getId(), GamificationService.POINTS_INSTALL,
+                    "INSTALL", "Cài đặt skill", "SKILL", skillId);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1539,6 +1570,14 @@ public class SkillServiceImpl implements SkillService {
         }
         return userRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
+    }
+
+    private Map<Long, ReputationScore> loadReputations(List<Skill> skills) {
+        if (skills.isEmpty()) {
+            return Map.of();
+        }
+        return reputationService.getReputations("SKILL",
+                skills.stream().map(Skill::getId).toList());
     }
 
     private Map<Long, RatingAgg> loadRatings(List<Skill> skills) {

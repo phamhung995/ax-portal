@@ -27,6 +27,12 @@ public record SkillRequestFeedItem(
         /** The two newest comments (preview). */
         List<TopCommentItem> topComments,
         /** Attachments: images render in the grid, other files as download links. */
-        List<SkillRequestFileItem> files
+        List<SkillRequestFileItem> files,
+        /** Staked bounty points (0 = no bounty). */
+        int bountyPoints,
+        /** NONE | ACTIVE | FULFILLED | EXPIRED | REFUNDED */
+        String bountyStatus,
+        Instant bountyExpiresAt,
+        Long fulfilledSkillId
 ) {
 }

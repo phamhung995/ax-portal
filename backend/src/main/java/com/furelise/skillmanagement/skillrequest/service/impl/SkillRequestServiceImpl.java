@@ -375,7 +375,11 @@ public class SkillRequestServiceImpl implements SkillRequestService {
                     resolvedSkills,
                     resolvedSkillCount,
                     topComments,
-                    fileItems);
+                    fileItems,
+                    r.getBountyPoints() != null ? r.getBountyPoints() : 0,
+                    r.getBountyStatus(),
+                    r.getBountyExpiresAt(),
+                    r.getFulfilledSkillId());
         }).toList();
     }
 

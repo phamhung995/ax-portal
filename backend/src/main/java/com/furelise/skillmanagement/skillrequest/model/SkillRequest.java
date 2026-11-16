@@ -49,6 +49,29 @@ public class SkillRequest {
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 
+    // ---- Bounty (treo thưởng, V126) ----
+    /** Staked points (escrowed at posting). 0 = no bounty. */
+    @Column(name = "bounty_points", nullable = false)
+    @Builder.Default
+    private Integer bountyPoints = 0;
+
+    /** NONE | ACTIVE | FULFILLED | EXPIRED | REFUNDED */
+    @Column(name = "bounty_status", length = 20, nullable = false)
+    @Builder.Default
+    private String bountyStatus = "NONE";
+
+    @Column(name = "bounty_expires_at")
+    private Instant bountyExpiresAt;
+
+    @Column(name = "fulfilled_skill_id")
+    private Long fulfilledSkillId;
+
+    @Column(name = "fulfilled_by")
+    private Long fulfilledBy;
+
+    @Column(name = "bounty_awarded_at")
+    private Instant bountyAwardedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

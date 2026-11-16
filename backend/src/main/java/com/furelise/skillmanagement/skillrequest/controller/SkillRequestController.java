@@ -10,6 +10,7 @@ import com.furelise.skillmanagement.skillrequest.dto.SkillRequestFeedResult;
 import com.furelise.skillmanagement.skillrequest.dto.SkillRequestSuggestions;
 import com.furelise.skillmanagement.skillrequest.dto.SkillRequestStatsResult;
 import com.furelise.skillmanagement.skillrequest.model.SkillRequestFile;
+import com.furelise.skillmanagement.skillrequest.service.BountyService;
 import com.furelise.skillmanagement.skillrequest.service.SkillRequestFileStorageService;
 import com.furelise.skillmanagement.skillrequest.service.SkillRequestService;
 import com.furelise.skillmanagement.user.model.User;
@@ -36,6 +37,7 @@ public class SkillRequestController {
 
     private final SkillRequestService skillRequestService;
     private final SkillRequestFileStorageService skillRequestFileStorageService;
+    private final BountyService bountyService;
 
     /**
      * Feed of requests ranked by (vote*2 + comment) * time decay.
@@ -72,10 +74,15 @@ public class SkillRequestController {
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "hashtags", required = false) String hashtags,
+            @RequestParam(value = "bountyPoints", required = false) Integer bountyPoints,
             @RequestParam(value = "file", required = false) MultipartFile[] files) {
         List<String> hashtagList = parseHashtags(hashtags);
         Long id = skillRequestService.create(new SkillRequestCreateRequest(title, description, hashtagList),
                 files, user);
+        // Optional bounty: stake points on the request (escrowed immediately).
+        if (bountyPoints != null && bountyPoints > 0) {
+            bountyService.postBounty(id, user.getId(), bountyPoints);
+        }
         return ResponseEntity.status(201).body(ApiResponse.ok(id));
     }
 
