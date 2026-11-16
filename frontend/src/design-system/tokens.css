@@ -1,15 +1,21 @@
 :root {
   color-scheme: dark;
-  /* Global */
-  --ds-color-space-950: #100d2b;
-  --ds-color-space-900: #101b3e;
-  --ds-color-indigo-700: #302577;
-  --ds-color-cyan-400: #67e8f9;
-  --ds-color-teal-400: #49dccf;
-  --ds-color-violet-400: #a58aef;
-  --ds-color-mint-300: #9ce8d0;
-  --ds-color-rose-300: #ffacc4;
-  --ds-color-amber-300: #f3d28c;
+  /* AX-Portal Design System v2.0 — Linear style.
+   * Replaces the v1.x neon / glass / bokeh language.
+   * Near-monochrome, one accent, quiet chrome.
+   * Variable names (--ds-*) are kept so existing Prism components keep working;
+   * only their values change. Removed: bokeh, glass blur, glow shadows. */
+  /* Global — neutrals (Linear-like, near-black) */
+  --ds-color-space-950: #08090a;
+  --ds-color-space-900: #14161a;
+  --ds-color-space-800: #1d1f24;
+  --ds-color-indigo-700: #5e6ad2;
+  --ds-color-cyan-400: #5e6ad2;
+  --ds-color-teal-400: #5e6ad2;
+  --ds-color-violet-400: #8b93e8;
+  --ds-color-mint-300: #4cc38a;
+  --ds-color-rose-300: #e5534b;
+  --ds-color-amber-300: #e5a100;
   --ds-space-1: 4px;
   --ds-space-2: 8px;
   --ds-space-3: 12px;
@@ -19,44 +25,61 @@
   --ds-space-8: 32px;
   --ds-space-12: 48px;
   --ds-space-16: 64px;
-  --ds-radius-sm: 8px;
-  --ds-radius-md: 12px;
-  --ds-radius-lg: 16px;
-  --ds-font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --ds-font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  --ds-radius-sm: 6px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 12px;
+  --ds-radius-xl: 16px;
+  --ds-font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --ds-font-mono: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  /* Motion — UX smoothness (v2.0 focus) */
+  --ds-duration-instant: 120ms;
   --ds-duration-fast: 160ms;
   --ds-duration-normal: 220ms;
-  --ds-ease: cubic-bezier(.33,1,.68,1);
+  --ds-ease: cubic-bezier(.33, 1, .68, 1);
+  --ds-ease-out: cubic-bezier(.16, 1, .3, 1);
+  /* Layers — 3-tier z-index approved from the Linear screenshot:
+   * 0 = background + flat sidebar (same plane, no border/shadow/radius)
+   * 10 = main content card
+   * 50 = AI assistant floating panel (highest, no backdrop) */
+  --ds-z-background: 0;
+  --ds-z-sidebar: 0;
+  --ds-z-main: 10;
+  --ds-z-ai-panel: 50;
+  --ds-z-toast: 60;
   /* Semantic */
-  --ds-color-canvas: var(--ds-color-space-950);
-  --ds-color-text-primary: #eef8ff;
-  --ds-color-text-secondary: #bacce4;
-  --ds-color-text-muted: #99acc9;
-  --ds-color-accent: var(--ds-color-cyan-400);
-  --ds-color-success: var(--ds-color-mint-300);
-  --ds-color-danger: var(--ds-color-rose-300);
-  --ds-color-warning: var(--ds-color-amber-300);
-  --ds-color-border: rgb(133 234 255 / .17);
-  --ds-color-border-strong: rgb(133 234 255 / .42);
-  --ds-surface-alpha: .10;
-  --ds-surface-blur: 4px;
-  --ds-surface-tint: rgb(24 55 92 / var(--ds-surface-alpha));
-  --ds-surface-reflection: linear-gradient(125deg, rgb(181 241 255 / .055), rgb(181 241 255 / .005) 42%, rgb(165 138 239 / .035));
-  --ds-shadow-glass: inset 0 1px 0 rgb(219 252 255 / .09), 0 0 8px rgb(103 232 249 / .04), 0 12px 36px rgb(3 5 23 / .14);
-  --ds-shadow-glow: 0 0 6px rgb(103 232 249 / .16), 0 0 26px rgb(103 232 249 / .08);
+  --ds-color-canvas: #08090a;
+  --ds-color-surface: #14161a;
+  --ds-color-surface-raised: #1d1f24;
+  --ds-color-text-primary: #e8e9eb;
+  --ds-color-text-secondary: #9a9da6;
+  --ds-color-text-muted: #6b6f78;
+  --ds-color-accent: #5e6ad2;
+  --ds-color-success: #4cc38a;
+  --ds-color-danger: #e5534b;
+  --ds-color-warning: #e5a100;
+  --ds-color-border: rgb(255 255 255 / .08);
+  --ds-color-border-strong: rgb(255 255 255 / .14);
+  --ds-surface-alpha: 1;
+  --ds-surface-blur: 0;
+  --ds-surface-tint: var(--ds-color-surface);
+  --ds-surface-reflection: none;
+  --ds-shadow-card: 0 8px 32px rgb(0 0 0 / .45);
+  --ds-shadow-panel: 0 24px 64px rgb(0 0 0 / .6);
+  --ds-shadow-glass: var(--ds-shadow-card);
+  --ds-shadow-glow: none;
   --ds-focus-ring: 2px solid var(--ds-color-accent);
-  --ds-control-height: 44px;
+  --ds-control-height: 40px;
   /* Component */
-  --ds-button-primary-background: rgb(39 151 180 / .20);
-  --ds-button-secondary-background: rgb(126 94 211 / .16);
-  --ds-input-background: rgb(9 20 45 / .35);
-  --ds-input-hover-background: rgb(13 27 58 / .5);
-  --ds-input-focus-background: rgb(13 27 58 / .58);
-  --ds-dialog-background: rgb(15 32 62 / .40);
-  --ds-dialog-blur: 7px;
-  --ds-dialog-scrim: rgb(5 8 26 / .30);
-  --ds-toast-background: rgb(15 32 62 / .88);
-  --ds-list-item-background: rgb(8 13 32 / .92);
-  --ds-list-item-hover-accent: rgb(103 232 249 / .14);
+  --ds-button-primary-background: rgb(94 106 210 / .16);
+  --ds-button-secondary-background: rgb(255 255 255 / .06);
+  --ds-input-background: rgb(255 255 255 / .04);
+  --ds-input-hover-background: rgb(255 255 255 / .06);
+  --ds-input-focus-background: rgb(255 255 255 / .06);
+  --ds-dialog-background: #1d1f24;
+  --ds-dialog-blur: 0;
+  --ds-dialog-scrim: rgb(0 0 0 / .5);
+  --ds-toast-background: #1d1f24;
+  --ds-list-item-background: transparent;
+  --ds-list-item-hover-accent: rgb(255 255 255 / .04);
   --ds-list-item-border: var(--ds-color-accent);
 }
