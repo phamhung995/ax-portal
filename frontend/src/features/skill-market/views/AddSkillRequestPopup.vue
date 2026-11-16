@@ -28,6 +28,8 @@ const MAX_TOTAL_SIZE = MAX_FILES * MAX_FILE_SIZE // 100MB
 const title = ref('')
 const description = ref('')
 const hashtags = ref<string[]>([])
+/** Optional bounty (treo thưởng): points are locked (escrow) for 14 days. */
+const bountyPoints = ref<number | undefined>(undefined)
 const tagInput = ref('')
 const saving = ref(false)
 const titleError = ref('')
@@ -130,6 +132,7 @@ function resetForm() {
   description.value = ''
   hashtags.value = []
   tagInput.value = ''
+  bountyPoints.value = undefined
   titleError.value = ''
   suggestions.value = null
   suggestionsLoading.value = false
@@ -206,6 +209,10 @@ function validate(): boolean {
     toastError(t('app.skillMarket.titleTooLong'))
     return false
   }
+  if (bountyPoints.value != null && (bountyPoints.value < 50 || bountyPoints.value > 5000)) {
+    toastError('Tiền thưởng phải từ 50 đến 5000 điểm.')
+    return false
+  }
   return true
 }
 
@@ -218,6 +225,7 @@ async function save() {
       description: description.value.trim() || undefined,
       hashtags: hashtags.value,
       files: pendingFiles.value.map((p) => p.file),
+      bountyPoints: bountyPoints.value ?? undefined,
     })
     toastSuccess(t('app.skillMarket.createdToast'))
     emit('saved')
@@ -299,6 +307,19 @@ function confirmDiscard() {
         :placeholder="t('app.skillMarket.descPh')"
         :rows="4"
       />
+
+      <PrismInput
+        v-model.number="bountyPoints"
+        type="number"
+        label="Treo thưởng (điểm, tùy chọn)"
+        placeholder="VD: 200"
+        :min="50"
+        :max="5000"
+      >
+        <template #suffix>
+          <small class="add-count">Điểm bị khóa ngay khi đăng (ký quỹ 14 ngày); tự động trao khi có người đáp ứng.</small>
+        </template>
+      </PrismInput>
 
       <div class="add-field">
         <label class="p-label">

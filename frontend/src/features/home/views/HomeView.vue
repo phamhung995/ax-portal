@@ -13,6 +13,8 @@ import PrismStarRating from '@/design-system/components/PrismStarRating.vue'
 import PrismTabs from '@/design-system/components/PrismTabs.vue'
 import { skillRequestApi } from '@/features/skill-market/api'
 import type { SkillRequestFeedItem } from '@/features/skill-market/types'
+import { gamificationApi } from '@/features/gamification/api'
+import type { CheckInResult, GamificationMe } from '@/features/gamification/api'
 import { homeApi } from '@/features/home/api'
 import { aiNewsApi } from '@/features/ai-news/api'
 import { useI18nStore } from '@/stores/i18n'
@@ -35,6 +37,36 @@ const i18n = useI18nStore()
 const { t, formatDate } = i18n
 
 const activeTab = ref<'chart' | 'community'>('community')
+
+// ── Gamification: points wallet + daily check-in (guide §6) ────────────────
+const pointsMe = ref<GamificationMe | null>(null)
+const checkInBusy = ref(false)
+const checkInMsg = ref('')
+
+async function loadPoints() {
+  try {
+    pointsMe.value = await gamificationApi.me()
+  } catch {
+    pointsMe.value = null
+  }
+}
+
+async function doCheckIn() {
+  if (checkInBusy.value || pointsMe.value?.checkedInToday) return
+  checkInBusy.value = true
+  try {
+    const r: CheckInResult = await gamificationApi.checkIn()
+    pointsMe.value = { balance: r.balance, checkedInToday: true, streak: r.streak, activeRedemptions: pointsMe.value?.activeRedemptions ?? 0 }
+    checkInMsg.value =
+      `Điểm danh thành công +${r.awardedPoints} điểm` +
+      (r.bonusPoints > 0 ? ` (thưởng chuỗi ${r.streak} ngày +${r.bonusPoints})` : '') +
+      ` · Chuỗi ${r.streak} ngày`
+  } catch {
+    checkInMsg.value = 'Điểm danh thất bại, thử lại sau.'
+  } finally {
+    checkInBusy.value = false
+  }
+}
 
 // Tab bar: Community is for everyone (default); Chart is admin-only.
 const tabItems = computed(() => [
@@ -448,10 +480,12 @@ function buildBannerI18n() {
   const phrasePool: string[] = []
   for (const key of Object.keys(m)) {
     const match = /^home\.banner\.speech\.(.+)$/.exec(key)
-    if (!match) continue
+    if (!match || !match[1]) continue
     const value = m[key]
-    speech[match[1]] = value
-    if (value) phrasePool.push(value)
+    if (value) {
+      speech[match[1]] = value
+      phrasePool.push(value)
+    }
   }
   // Personalized greeting: substitute {name} with the logged-in user's
   // display name (Home SRS §5.3 greeting region uses the same source).
@@ -497,6 +531,7 @@ onMounted(async () => {
   loadCommunity()
   loadRequests()
   loadNews()
+  loadPoints()
   // Banner height: track the KPI region (bottom edge = banner bottom) and
   // .home (top edge). The KPI region reflows on load/error/narrow screens
   // and admin alert banners push it down — the observer covers all of that.
@@ -738,6 +773,21 @@ onBeforeUnmount(() => {
             <div class="greeting">
               <h2 class="greeting-title">{{ t('home.hello', { name: auth.user?.userName ?? '' }) }}</h2>
               <p v-if="orgParts" class="greeting-meta">{{ orgParts }}</p>
+            </div>
+            <!-- Points wallet + daily check-in (guide §6) -->
+            <div v-if="pointsMe" class="points-widget">
+              <span class="points-balance" title="Số điểm hiện có">⭐ {{ pointsMe.balance }} điểm</span>
+              <span v-if="pointsMe.streak > 0" class="points-streak" title="Chuỗi điểm danh">🔥 {{ pointsMe.streak }} ngày</span>
+              <PrismButton
+                v-if="!pointsMe.checkedInToday"
+                variant="secondary"
+                :disabled="checkInBusy"
+                @click="doCheckIn"
+              >
+                Điểm danh +10
+              </PrismButton>
+              <span v-else class="points-checked">✓ Đã điểm danh</span>
+              <span v-if="checkInMsg" class="points-msg">{{ checkInMsg }}</span>
             </div>
           </div>
 
@@ -1430,6 +1480,38 @@ onBeforeUnmount(() => {
   margin: 2px 0 0;
   font-size: 12px;
   color: var(--ds-color-text-muted);
+}
+
+/* Points wallet + daily check-in (guide §6). */
+.points-widget {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.points-balance {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ds-color-text-primary);
+  background: var(--ds-color-bg-elevated);
+  border: 1px solid var(--ds-color-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.points-streak {
+  font-size: 12px;
+  color: var(--ds-color-text-muted);
+}
+.points-checked {
+  font-size: 12px;
+  color: var(--ds-color-text-muted);
+}
+.points-msg {
+  font-size: 12px;
+  color: var(--ds-color-accent);
+  width: 100%;
+  text-align: right;
 }
 
 .compact-banner {

@@ -17,6 +17,7 @@ import SkillDetailPopup from './SkillDetailPopup.vue'
 import SearchUserPopup from './SearchUserPopup.vue'
 import ManageTaxonomyPopup from './ManageTaxonomyPopup.vue'
 import BadgeStack from './BadgeStack.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
 import { skillApi } from '@/features/skills/api'
 import { toUserError } from '@/lib/api'
 import { stripHtml } from '@/lib/sanitize'
@@ -423,7 +424,7 @@ onMounted(() => {
     if (typeof q.createdTo === 'string') s.createdDateTo = q.createdTo
     // Home KPI deep-links: Total Views / Average Rating sort, Subscribed filter.
     if (q.subscribed === '1') s.subscribed = 'Y'
-    if (q.sortBy === 'viewCount' || q.sortBy === 'avgRating') {
+    if (q.sortBy === 'viewCount' || q.sortBy === 'avgRating' || q.sortBy === 'reputation') {
       s.sortBy = q.sortBy
       s.sortDirection = 'DESC'
     }
@@ -685,6 +686,10 @@ watch(
               ★ {{ (row as SkillListItem).avgRating!.toFixed(1) }} ({{ (row as SkillListItem).ratingCount }})
             </span>
             <span v-else class="sm-norating">{{ t('app.common.noRating') }}</span>
+            <ReputationBadge
+              :tier="(row as SkillListItem).reputationTier"
+              :score="(row as SkillListItem).reputationScore"
+            />
           </template>
           <template #cell-subscribe="{ row }">
             <button
@@ -761,6 +766,7 @@ watch(
               <span>{{ t('app.common.views', { n: item.viewCount }) }}</span>
               <span v-if="item.avgRating != null" class="sc-rating">★ {{ item.avgRating.toFixed(1) }}</span>
               <span v-else class="sc-norating">{{ t('app.common.noRating') }}</span>
+              <ReputationBadge :tier="item.reputationTier" :score="item.reputationScore" />
             </div>
           </div>
         </div>

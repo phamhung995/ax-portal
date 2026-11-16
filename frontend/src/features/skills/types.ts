@@ -26,6 +26,10 @@ export interface SkillListItem {
   isCowork: boolean
   /** Total download events recorded for this skill. */
   downloadCount: number
+  /** Cached reputation score (0-100, null = not enough ratings yet). */
+  reputationScore: number | null
+  /** NEW | TRUSTED | POPULAR. */
+  reputationTier: string
 }
 
 export interface SkillSearchResult {

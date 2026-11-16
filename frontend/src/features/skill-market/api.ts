@@ -1,5 +1,7 @@
 import { api, request } from '@/lib/api'
 import type {
+  BountyClaim,
+  BountyInfo,
   SkillRequestFeedItem,
   SkillRequestFeedResult,
   SkillRequestCommentPage,
@@ -25,11 +27,14 @@ export const skillRequestApi = {
   /** The N most recently created requests (newest first) — Home "New Request" card. */
   recent: (limit = 5) =>
     request<SkillRequestFeedItem[]>(api.get('/skill-requests/recent', { params: { limit } })),
-  create: (payload: { title: string; description?: string; hashtags: string[]; files?: File[] }) => {
+  create: (payload: { title: string; description?: string; hashtags: string[]; files?: File[]; bountyPoints?: number }) => {
     const form = new FormData()
     form.append('title', payload.title)
     if (payload.description) form.append('description', payload.description)
     form.append('hashtags', JSON.stringify(payload.hashtags))
+    if (payload.bountyPoints && payload.bountyPoints > 0) {
+      form.append('bountyPoints', String(payload.bountyPoints))
+    }
     for (const file of payload.files ?? []) form.append('file', file)
     return request<number>(api.post('/skill-requests', form))
   },
@@ -78,6 +83,19 @@ export const skillRequestApi = {
     request<void>(api.post(`/skill-requests/${id}/comments/${commentId}/like`)),
   unlikeComment: (id: number, commentId: number) =>
     request<void>(api.delete(`/skill-requests/${id}/comments/${commentId}/like`)),
+  // ── Bounty (treo thưởng, guide §6) ───────────────────────────────────────
+  postBounty: (id: number, points: number) =>
+    request<BountyInfo>(api.post(`/skill-requests/${id}/bounty`, { points })),
+  claims: (id: number) =>
+    request<BountyClaim[]>(api.get(`/skill-requests/${id}/claims`)),
+  claim: (id: number, skillId: number) =>
+    request<BountyClaim>(api.post(`/skill-requests/${id}/claims`, { skillId })),
+  acceptClaim: (claimId: number) =>
+    request<BountyClaim>(api.post(`/skill-requests/claims/${claimId}/accept`)),
+  rejectClaim: (claimId: number) =>
+    request<BountyClaim>(api.post(`/skill-requests/claims/${claimId}/reject`)),
+  disputeClaim: (claimId: number) =>
+    request<BountyClaim>(api.post(`/skill-requests/claims/${claimId}/dispute`)),
   // ── Duplicate suggestions (option A) ──────────────────────────────────────
   suggestions: (keyword: string) =>
     request<SkillRequestSuggestions>(api.get('/skill-requests/suggestions', { params: { keyword } })),

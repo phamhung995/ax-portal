@@ -52,6 +52,35 @@ export interface SkillRequestFeedItem {
   resolvedSkillCount: number
   topComments: TopCommentItem[]
   files: SkillRequestFileItem[]
+  /** Staked bounty points (0 = no bounty). */
+  bountyPoints: number
+  /** NONE | ACTIVE | FULFILLED | EXPIRED | REFUNDED */
+  bountyStatus: string
+  bountyExpiresAt: string | null
+  fulfilledSkillId: number | null
+}
+
+export interface BountyClaim {
+  id: number
+  requestId: number
+  skillId: number
+  skillName: string | null
+  claimantId: number
+  claimantName: string | null
+  claimType: 'BUILD' | 'MATCH'
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'DISPUTED'
+  decideBy: string
+  createdAt: string
+}
+
+export interface BountyInfo {
+  requestId: number
+  bountyPoints: number
+  bountyStatus: string
+  bountyExpiresAt: string | null
+  fulfilledSkillId: number | null
+  fulfilledBy: number | null
+  bountyAwardedAt: string | null
 }
 
 export interface SkillRequestFeedResult {

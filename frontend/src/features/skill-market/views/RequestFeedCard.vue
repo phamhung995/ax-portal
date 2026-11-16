@@ -157,6 +157,9 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
           <PrismBadge v-if="item.hasResolvedComment" tone="success" class="card-resolved">
             <Check :size="12" aria-hidden="true" /> {{ t('app.skillMarket.resolved') }}
           </PrismBadge>
+          <PrismBadge v-if="item.bountyPoints > 0" tone="info" class="card-bounty" title="Treo thưởng: điểm được khóa khi đăng, trao cho người đáp ứng">
+            🏆 {{ item.bountyPoints }} điểm
+          </PrismBadge>
         </span>
       </div>
       <!-- Kebab menu (creator only) -->

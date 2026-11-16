@@ -13,6 +13,9 @@ import PrismAvatar from '@/design-system/components/PrismAvatar.vue'
 import EditSkillPopup from './EditSkillPopup.vue'
 import UpdateVersionPopup from './UpdateVersionPopup.vue'
 import ShareSkillPopup from './ShareSkillPopup.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
+import { reputationApi } from '@/features/gamification/api'
+import type { ReputationExplain } from '@/features/gamification/api'
 import { skillApi } from '@/features/skills/api'
 import McpDetailPopup from '@/features/mcp/views/McpDetailPopup.vue'
 import { toUserError } from '@/lib/api'
@@ -35,6 +38,8 @@ const avgRating = ref<number | null>(null)
 const totalRatings = ref(0)
 const myRating = ref<number | null>(null)
 const hoverRating = ref<number | null>(null)
+/** Reputation tier + "why this rank?" reasons (cached score, guide §2). */
+const reputation = ref<ReputationExplain | null>(null)
 
 const comments = ref<SkillCommentDTO[]>([])
 const commentTotal = ref(0)
@@ -235,6 +240,16 @@ async function loadRating() {
     myRating.value = await skillApi.myRating(props.skillId)
   } catch {
     // non-fatal
+  }
+  void loadReputation()
+}
+
+async function loadReputation() {
+  if (!props.skillId) return
+  try {
+    reputation.value = await reputationApi.explain('SKILL', props.skillId)
+  } catch {
+    reputation.value = null
   }
 }
 
@@ -830,6 +845,12 @@ async function toggleSubscribe() {
               ★ {{ avgRating.toFixed(1) }}/5 ({{ totalRatings }})
             </span>
             <span v-else class="dtl-norating">{{ t('app.common.noRating') }}</span>
+            <span v-if="reputation" class="dtl-reputation">
+              <ReputationBadge :tier="reputation.tier" :score="reputation.score" />
+              <PrismTooltip :content="reputation.reasons.join('\n')">
+                <span class="dtl-reputation-why">Vì sao?</span>
+              </PrismTooltip>
+            </span>
             <!-- Star rating (editable when APPROVED) -->
             <div class="dtl-rate" :class="{ 'is-disabled': !isApproved }">
               <button

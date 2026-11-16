@@ -11,6 +11,7 @@ import RichTextEditor from '@/components/RichTextEditor.vue'
 import type { MentionSuggestionItem } from '@/components/RichTextEditor.vue'
 import CommentTreeNode from '@/features/skill-market/views/CommentTreeNode.vue'
 import LinkSkillPopup from './LinkSkillPopup.vue'
+import RegisterSkillPopup from './RegisterSkillPopup.vue'
 import EditSkillRequestPopup from './EditSkillRequestPopup.vue'
 import SkillDetailPopup from '@/features/skills/views/SkillDetailPopup.vue'
 import { skillRequestApi } from '@/features/skill-market/api'
@@ -20,6 +21,7 @@ import { sanitizeHtml, stripHtml } from '@/lib/sanitize'
 import { useAuthStore } from '@/stores/auth'
 import { useI18nStore } from '@/stores/i18n'
 import type {
+  BountyClaim,
   SkillRequestFeedItem,
   SkillRequestCommentItem,
   SkillRequestStatsResult,
@@ -54,6 +56,80 @@ const posting = ref(false)
 const pendingSkill = ref<SkillListItem | null>(null)
 const linkPopupOpen = ref(false)
 const detailSkillId = ref<number | null>(null)
+
+// ── Bounty (treo thưởng, guide §6) ─────────────────────────────────────────
+const claims = ref<BountyClaim[]>([])
+const bountyLinkOpen = ref(false)
+const bountyRegisterOpen = ref(false)
+const claimBusy = ref(false)
+
+async function loadClaims() {
+  if (!validId.value) return
+  try {
+    claims.value = await skillRequestApi.claims(requestId.value)
+  } catch {
+    claims.value = []
+  }
+}
+
+async function onBountyClaimSelected(skill: SkillListItem) {
+  if (claimBusy.value) return
+  claimBusy.value = true
+  try {
+    await skillRequestApi.claim(requestId.value, skill.id)
+    toastSuccess('Đã gửi đáp ứng bằng skill này.')
+    await Promise.all([loadClaims(), loadDetail()])
+  } catch (err) {
+    toastError(toUserError(err).message)
+  } finally {
+    claimBusy.value = false
+  }
+}
+
+async function onBountyRegisterSaved(skillId: number) {
+  await onBountyClaimSelected({ id: skillId } as SkillListItem)
+}
+
+async function onAcceptClaim(claim: BountyClaim) {
+  if (claimBusy.value) return
+  claimBusy.value = true
+  try {
+    await skillRequestApi.acceptClaim(claim.id)
+    toastSuccess('Đã chấp nhận đáp ứng, điểm thưởng đã chuyển.')
+    await Promise.all([loadClaims(), loadDetail()])
+  } catch (err) {
+    toastError(toUserError(err).message)
+  } finally {
+    claimBusy.value = false
+  }
+}
+
+async function onRejectClaim(claim: BountyClaim) {
+  if (claimBusy.value) return
+  claimBusy.value = true
+  try {
+    await skillRequestApi.rejectClaim(claim.id)
+    await loadClaims()
+  } catch (err) {
+    toastError(toUserError(err).message)
+  } finally {
+    claimBusy.value = false
+  }
+}
+
+async function onDisputeClaim(claim: BountyClaim) {
+  if (claimBusy.value) return
+  claimBusy.value = true
+  try {
+    await skillRequestApi.disputeClaim(claim.id)
+    toastSuccess('Đã gửi khiếu nại, admin sẽ xem xét.')
+    await loadClaims()
+  } catch (err) {
+    toastError(toUserError(err).message)
+  } finally {
+    claimBusy.value = false
+  }
+}
 
 // ── Reply state (one open reply form at a time) ───────────────────────────
 const replyParentId = ref<number | null>(null)
@@ -204,6 +280,7 @@ async function loadDetail() {
   try {
     item.value = await skillRequestApi.detail(requestId.value)
     void loadComments(true)
+    void loadClaims()
   } catch (err) {
     loadError.value = toUserError(err).message
   } finally {
@@ -548,6 +625,57 @@ onBeforeUnmount(() => {
                 </span>
               </div>
 
+              <!-- Bounty (treo thưởng, guide §6) -->
+              <div v-if="item.bountyPoints > 0" class="srd-bounty">
+                <PrismBadge tone="info">🏆 Treo thưởng {{ item.bountyPoints }} điểm</PrismBadge>
+                <span v-if="item.bountyStatus === 'ACTIVE'" class="srd-bounty-note">
+                  Điểm đã khóa ký quỹ · Hết hạn {{ item.bountyExpiresAt ? timeAgo(item.bountyExpiresAt) : '—' }}
+                </span>
+                <span v-else-if="item.bountyStatus === 'FULFILLED'" class="srd-bounty-note">
+                  Đã trao thưởng
+                </span>
+                <span v-else class="srd-bounty-note">
+                  {{ item.bountyStatus === 'REFUNDED' ? 'Đã hoàn điểm cho người treo' : 'Đã hết hạn' }}
+                </span>
+                <div v-if="item.bountyStatus === 'ACTIVE' && !item.isRequestCreator" class="srd-bounty-actions">
+                  <PrismButton variant="secondary" :disabled="claimBusy" @click="bountyLinkOpen = true">
+                    Giới thiệu skill có sẵn
+                  </PrismButton>
+                  <PrismButton variant="secondary" :disabled="claimBusy" @click="bountyRegisterOpen = true">
+                    Đăng skill mới
+                  </PrismButton>
+                </div>
+                <div v-if="claims.length" class="srd-claims">
+                  <div v-for="c in claims" :key="c.id" class="srd-claim">
+                    <span class="srd-claim-skill">{{ c.skillName ?? `#${c.skillId}` }}</span>
+                    <span class="srd-claim-by">bởi {{ c.claimantName ?? '—' }}</span>
+                    <PrismBadge :tone="c.claimType === 'BUILD' ? 'info' : 'neutral'">
+                      {{ c.claimType === 'BUILD' ? 'Tạo mới' : 'Giới thiệu' }}
+                    </PrismBadge>
+                    <PrismBadge
+                      :tone="c.status === 'ACCEPTED' ? 'success' : c.status === 'PENDING' ? 'info' : c.status === 'DISPUTED' ? 'warning' : 'neutral'"
+                    >
+                      {{ c.status === 'ACCEPTED' ? 'Đã nhận' : c.status === 'PENDING' ? 'Chờ quyết định' : c.status === 'DISPUTED' ? 'Khiếu nại' : 'Đã từ chối' }}
+                    </PrismBadge>
+                    <span v-if="item.isRequestCreator && c.status === 'PENDING'" class="srd-claim-actions">
+                      <PrismButton variant="secondary" :disabled="claimBusy" @click="onAcceptClaim(c)">Chấp nhận</PrismButton>
+                      <PrismButton variant="ghost" :disabled="claimBusy" @click="onRejectClaim(c)">Từ chối</PrismButton>
+                    </span>
+                    <button
+                      v-if="c.status === 'PENDING' && (item.isRequestCreator || c.claimantId === viewerId)"
+                      type="button"
+                      class="srd-claim-dispute"
+                      @click="onDisputeClaim(c)"
+                    >
+                      Khiếu nại
+                    </button>
+                  </div>
+                  <p class="srd-claim-hint">
+                    Người treo thưởng quyết định trong 7 ngày; im lặng quá hạn thì hệ thống tự trao cho đáp ứng hợp lệ đầu tiên. Giới thiệu skill của người khác: tác giả 70% / người giới thiệu 30%.
+                  </p>
+                </div>
+              </div>
+
               <!-- Resolved skills (from resolved comments) -->
               <div v-if="item.resolvedSkills.length" class="resolved-skills">
                 <span class="resolved-label">
@@ -730,6 +858,8 @@ onBeforeUnmount(() => {
     </div>
 
     <LinkSkillPopup v-model:open="linkPopupOpen" @selected="onSkillSelected" />
+    <LinkSkillPopup v-model:open="bountyLinkOpen" @selected="onBountyClaimSelected" />
+    <RegisterSkillPopup v-model:open="bountyRegisterOpen" @saved="onBountyRegisterSaved" />
     <SkillDetailPopup :skill-id="detailSkillId" @closed="detailSkillId = null" />
 
     <!-- Edit request -->
