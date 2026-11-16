@@ -576,7 +576,7 @@ watch(() => props.justSent, () => {
   transition: background .15s ease, color .15s ease;
 }
 .ainews-like-btn:hover {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
 }
 .ainews-like-btn.is-liked {
   color: var(--ds-color-accent);
@@ -592,7 +592,7 @@ watch(() => props.justSent, () => {
 
 .ainews-divider {
   border: none;
-  border-top: 1px solid rgb(154 182 219 / .1);
+  border-top: 1px solid rgb(154 157 166 / .1);
   margin: var(--ds-space-1) 0;
 }
 
@@ -617,7 +617,7 @@ watch(() => props.justSent, () => {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border: 1px solid rgb(154 182 219 / .2);
+  border: 1px solid rgb(154 157 166 / .2);
   border-radius: 999px;
   background: none;
   color: var(--ds-color-text-secondary);
@@ -626,7 +626,7 @@ watch(() => props.justSent, () => {
   transition: background .15s ease, color .15s ease;
 }
 .ainews-sort-btn:hover {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
   color: var(--ds-color-text-primary);
 }
 /* Sort dropdown */
@@ -662,7 +662,7 @@ watch(() => props.justSent, () => {
   white-space: nowrap;
 }
 .ainews-sort-menu button:hover {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
   color: var(--ds-color-text-primary);
 }
 .ainews-sort-menu button.is-active {
@@ -772,7 +772,7 @@ watch(() => props.justSent, () => {
 .ainews-replies {
   margin-left: 24px;
   padding-left: 10px;
-  border-left: 2px solid rgb(154 182 219 / .15);
+  border-left: 2px solid rgb(154 157 166 / .15);
   gap: 6px;
   max-height: none;
   overflow: visible;
@@ -785,7 +785,7 @@ watch(() => props.justSent, () => {
 }
 .ainews-comment {
   padding: 10px 12px;
-  border: 1px solid rgb(154 182 219 / .12);
+  border: 1px solid rgb(154 157 166 / .12);
   border-radius: var(--ds-radius-sm);
   background: rgb(9 20 45 / .25);
 }
@@ -827,7 +827,7 @@ watch(() => props.justSent, () => {
   cursor: pointer;
 }
 .ainews-vote-btn:hover:not(:disabled) {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
 }
 .ainews-vote-btn.is-voted {
   color: var(--ds-color-accent);
@@ -849,7 +849,7 @@ watch(() => props.justSent, () => {
   cursor: pointer;
 }
 .ainews-link-btn:hover {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
 }
 .ainews-link-btn.is-danger {
   color: var(--ds-color-danger);
@@ -921,7 +921,7 @@ watch(() => props.justSent, () => {
 .ainews-comment-content :deep(.mention),
 .ainews-comment-content :deep(span[data-type="mention"]) {
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .12);
+  background: rgb(94 106 210 / .12);
   border-radius: 3px;
   padding: 0 3px;
   font-weight: 500;
@@ -963,7 +963,7 @@ watch(() => props.justSent, () => {
 @keyframes ainews-comment-flash {
   0% {
     box-shadow: 0 0 0 2px var(--ds-color-accent);
-    background: rgb(103 232 249 / .18);
+    background: rgb(94 106 210 / .18);
   }
   100% {
     box-shadow: 0 0 0 2px transparent;

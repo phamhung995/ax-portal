@@ -579,7 +579,7 @@ const columns = computed(() => [
   padding: 2px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 13px;
 }
@@ -636,7 +636,7 @@ const columns = computed(() => [
 }
 @media (hover: hover) {
   .bm-show-more:hover {
-    background: rgb(103 232 249 / .12);
+    background: rgb(94 106 210 / .12);
   }
 }
 </style>

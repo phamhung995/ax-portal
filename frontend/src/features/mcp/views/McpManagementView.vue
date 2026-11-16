@@ -835,7 +835,7 @@ watch(
 .sm-creator:focus-within {
   border-color: var(--ds-color-accent);
   background: var(--ds-input-focus-background);
-  box-shadow: 0 0 0 3px rgb(103 232 249 / .10), 0 0 14px rgb(103 232 249 / .05);
+  box-shadow: 0 0 0 3px rgb(94 106 210 / .10), 0 0 14px rgb(94 106 210 / .05);
 }
 .sm-tag {
   display: inline-flex;
@@ -844,7 +844,7 @@ watch(
   padding: 1px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 12px;
 }
@@ -1093,7 +1093,7 @@ watch(
 }
 .map-stage.is-active {
   border-color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .1);
+  background: rgb(94 106 210 / .1);
   box-shadow: var(--ds-shadow-glow);
 }
 .map-stage.is-gap {
@@ -1221,7 +1221,7 @@ watch(
   color: var(--ds-color-text-muted);
   margin-top: auto;
   padding-top: 8px;
-  border-top: 1px solid rgb(133 234 255 / .08);
+  border-top: 1px solid rgb(255 255 255 / .08);
 }
 .sc-rating {
   margin-left: auto;

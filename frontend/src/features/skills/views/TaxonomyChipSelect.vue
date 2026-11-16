@@ -82,11 +82,11 @@ function toggle(optionId: number) {
 .tcs-chip--stage.is-active {
   border-color: var(--ds-color-accent);
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .1);
+  background: rgb(94 106 210 / .1);
 }
 .tcs-chip--category.is-active {
-  border-color: var(--ds-color-violet-400, #a58aef);
-  color: var(--ds-color-violet-400, #a58aef);
+  border-color: var(--ds-color-violet-400, #8b93e8);
+  color: var(--ds-color-violet-400, #8b93e8);
   background: rgb(165 138 239 / .1);
 }
 .tcs-ph {

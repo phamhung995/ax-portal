@@ -325,12 +325,12 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
   transition: background var(--ds-duration-fast) ease, color var(--ds-duration-fast) ease;
 }
 .kebab-btn.is-open {
-  background: rgb(103 232 249 / .10);
+  background: rgb(94 106 210 / .10);
   color: var(--ds-color-text-primary);
 }
 @media (hover: hover) {
   .kebab-btn:hover {
-    background: rgb(103 232 249 / .10);
+    background: rgb(94 106 210 / .10);
     color: var(--ds-color-text-primary);
   }
 }
@@ -362,7 +362,7 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
 }
 @media (hover: hover) {
   .kebab-item:hover {
-    background: rgb(103 232 249 / .10);
+    background: rgb(94 106 210 / .10);
     color: var(--ds-color-text-primary);
   }
   .kebab-danger:hover {
@@ -588,8 +588,8 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
 }
 .reaction.is-voted {
   color: var(--ds-color-accent);
-  border-color: rgb(103 232 249 / .42);
-  background: rgb(103 232 249 / .10);
+  border-color: rgb(94 106 210 / .42);
+  background: rgb(94 106 210 / .10);
 }
 .reaction span {
   font: 12px var(--ds-font-mono);
@@ -615,7 +615,7 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
 }
 @media (hover: hover) {
   .comment-preview:hover {
-    background: rgb(103 232 249 / .04);
+    background: rgb(94 106 210 / .04);
   }
 }
 .comment-preview.is-resolved {
@@ -674,7 +674,7 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
 .comment-body :deep(.mention),
 .comment-body :deep(span[data-type="mention"]) {
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .12);
+  background: rgb(94 106 210 / .12);
   border-radius: 3px;
   padding: 0 3px;
 }

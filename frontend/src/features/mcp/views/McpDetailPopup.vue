@@ -1060,8 +1060,8 @@ async function toggleSubscribe() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgb(103 232 249 / .4);
-  background: rgb(103 232 249 / .08);
+  border: 1px solid rgb(94 106 210 / .4);
+  background: rgb(94 106 210 / .08);
   color: var(--ds-color-accent);
   font-size: 12px;
   font-weight: 600;
@@ -1079,7 +1079,7 @@ async function toggleSubscribe() {
 }
 @media (hover: hover) {
   .dtl-file-download.is-all:hover {
-    background: rgb(103 232 249 / .18);
+    background: rgb(94 106 210 / .18);
     border-color: var(--ds-color-accent);
     box-shadow: var(--ds-shadow-glow);
   }
@@ -1095,7 +1095,7 @@ async function toggleSubscribe() {
   padding: 2px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 13px;
 }
@@ -1125,14 +1125,14 @@ async function toggleSubscribe() {
   white-space: nowrap;
 }
 .dtl-badge--cat {
-  color: var(--ds-color-violet-400, #a58aef);
+  color: var(--ds-color-violet-400, #8b93e8);
   background: rgb(165 138 239 / .08);
   border: 1px solid rgb(165 138 239 / .35);
 }
 .dtl-badge--stage {
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .07);
-  border: 1px solid rgb(103 232 249 / .24);
+  background: rgb(94 106 210 / .07);
+  border: 1px solid rgb(94 106 210 / .24);
 }
 .dtl-desc {
   overflow-y: auto;
@@ -1380,7 +1380,7 @@ async function toggleSubscribe() {
   gap: var(--ds-space-2);
 }
 .dtl-version--current {
-  border-color: rgb(103 232 249 / .4);
+  border-color: rgb(94 106 210 / .4);
 }
 .dtl-version-head {
   display: flex;

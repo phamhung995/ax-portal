@@ -403,7 +403,7 @@ onBeforeUnmount(() => {
 }
 @media (hover: hover) {
   .composer-input:hover {
-    background: rgb(103 232 249 / .08);
+    background: rgb(94 106 210 / .08);
     border-color: var(--ds-color-border-strong);
     color: var(--ds-color-text-secondary);
     box-shadow: var(--ds-shadow-glow);
@@ -441,8 +441,8 @@ onBeforeUnmount(() => {
   }
 }
 .chip.is-active {
-  background: rgb(103 232 249 / .14);
-  border-color: rgb(103 232 249 / .42);
+  background: rgb(94 106 210 / .14);
+  border-color: rgb(94 106 210 / .42);
   color: var(--ds-color-accent);
   font-weight: 600;
 }
@@ -480,7 +480,7 @@ onBeforeUnmount(() => {
   color: var(--ds-color-text-muted);
 }
 .search-input:focus {
-  border-color: rgb(103 232 249 / .42);
+  border-color: rgb(94 106 210 / .42);
   background: rgb(16 13 43 / .72);
   box-shadow: var(--ds-shadow-glow);
 }
@@ -720,7 +720,7 @@ onBeforeUnmount(() => {
   padding: 4px 10px;
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 13px;
   cursor: pointer;

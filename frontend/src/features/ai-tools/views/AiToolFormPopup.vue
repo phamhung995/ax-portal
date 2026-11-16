@@ -315,7 +315,7 @@ async function onSave() {
   padding: var(--ds-space-2) var(--ds-space-3);
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
-  background: rgb(103 232 249 / .04);
+  background: rgb(94 106 210 / .04);
   margin-bottom: var(--ds-space-2);
 }
 .atf-existing-file-name {
@@ -357,7 +357,7 @@ async function onSave() {
 .atf-tags:focus-within {
   border-color: var(--ds-color-accent);
   background: var(--ds-input-focus-background);
-  box-shadow: 0 0 0 3px rgb(103 232 249 / .10), 0 0 14px rgb(103 232 249 / .05);
+  box-shadow: 0 0 0 3px rgb(94 106 210 / .10), 0 0 14px rgb(94 106 210 / .05);
 }
 .atf-tag {
   display: inline-flex;
@@ -366,7 +366,7 @@ async function onSave() {
   padding: 1px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 12px;
 }

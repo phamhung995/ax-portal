@@ -238,7 +238,7 @@ function timeAgo(iso: string): string {
 }
 /* Hairline between top-level comments only (not between a parent and its replies) */
 .ctn.is-top:not(:last-child) {
-  border-bottom: 1px solid rgb(133 234 255 / .08);
+  border-bottom: 1px solid rgb(255 255 255 / .08);
 }
 .ctn-replies {
   display: grid;
@@ -305,7 +305,7 @@ function timeAgo(iso: string): string {
 .comment-body :deep(.mention),
 .comment-body :deep(span[data-type="mention"]) {
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .12);
+  background: rgb(94 106 210 / .12);
   border-radius: 3px;
   padding: 0 3px;
 }
@@ -321,10 +321,10 @@ function timeAgo(iso: string): string {
   gap: 6px;
   font: 12px var(--ds-font-mono);
   padding: 3px 9px;
-  border: 1px solid rgb(103 232 249 / .24);
+  border: 1px solid rgb(94 106 210 / .24);
   border-radius: 6px;
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .07);
+  background: rgb(94 106 210 / .07);
   white-space: nowrap;
 }
 button.skill-chip {
@@ -333,8 +333,8 @@ button.skill-chip {
 }
 @media (hover: hover) {
   button.skill-chip:hover {
-    border-color: rgb(103 232 249 / .5);
-    background: rgb(103 232 249 / .14);
+    border-color: rgb(94 106 210 / .5);
+    background: rgb(94 106 210 / .14);
   }
 }
 .resolve-btn {
@@ -372,7 +372,7 @@ button.skill-chip {
 }
 @media (hover: hover) {
   .comment-action:hover {
-    background: rgb(103 232 249 / .08);
+    background: rgb(94 106 210 / .08);
     color: var(--ds-color-text-primary);
   }
 }
@@ -396,7 +396,7 @@ button.skill-chip {
   transition: border-color var(--ds-duration-fast) ease, box-shadow var(--ds-duration-fast) ease;
 }
 .reply-form:focus-within {
-  border-color: rgb(103 232 249 / .42);
+  border-color: rgb(94 106 210 / .42);
   box-shadow: var(--ds-shadow-glow);
 }
 /* Merge the tiptap editor into the form (drop its own border/bg) */

@@ -201,14 +201,14 @@ describe('Public component contracts', () => {
     dialog.close()
     dialog.remove()
   })
-  it('ambient background is decorative with all layers present', () => {
+  it('ambient background is a flat no-op in v2.0 Linear (no orbs/plexus/grid/noise/vignette)', () => {
     const wrapper = mount(PrismAmbientBackground)
     expect(wrapper.attributes('aria-hidden')).toBe('true')
-    expect(wrapper.find('.ambient-plexus').exists()).toBe(true)
-    expect(wrapper.find('.ambient-grid').exists()).toBe(true)
-    expect(wrapper.find('.ambient-noise').exists()).toBe(true)
-    expect(wrapper.find('.ambient-vignette').exists()).toBe(true)
-    expect(wrapper.findAll('.ambient-orb').length).toBe(3)
+    expect(wrapper.find('.ambient-plexus').exists()).toBe(false)
+    expect(wrapper.find('.ambient-grid').exists()).toBe(false)
+    expect(wrapper.find('.ambient-noise').exists()).toBe(false)
+    expect(wrapper.find('.ambient-vignette').exists()).toBe(false)
+    expect(wrapper.findAll('.ambient-orb').length).toBe(0)
   })
   it('radio group selects one option and moves focus with arrow keys', async () => {
     const wrapper = mount(PrismRadioGroup, { attachTo: document.body, props: { modelValue: 'a', label: 'Lựa chọn', options: [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma', disabled: true }] } })
@@ -440,13 +440,13 @@ describe('Public component contracts', () => {
     expect(wrapper.emitted('update:modelValue').at(-1)[0]).toEqual([])
   })
   it('color picker commits hex from preset, slider and typed input', async () => {
-    const wrapper = mount(PrismColorPicker, { attachTo: document.body, props: { modelValue: '#67e8f9', label: 'Màu nhấn' } })
+    const wrapper = mount(PrismColorPicker, { attachTo: document.body, props: { modelValue: '#5e6ad2', label: 'Màu nhấn' } })
     await wrapper.get('button').trigger('click')
     await nextTick()
     const panel = document.querySelector('.p-colorpicker-panel')
     expect(panel).toBeTruthy()
     await panel.querySelector('.p-colorpicker-preset').click()
-    expect(wrapper.emitted('update:modelValue').at(-1)[0]).toBe('#67e8f9')
+    expect(wrapper.emitted('update:modelValue').at(-1)[0]).toBe('#5e6ad2')
     const hue = panel.querySelector('input[type=range]')
     hue.value = '180'
     await hue.dispatchEvent(new Event('input'))

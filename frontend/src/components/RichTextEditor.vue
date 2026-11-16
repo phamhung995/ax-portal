@@ -686,7 +686,7 @@ onMounted(() => {
 }
 .rte-content :deep(.ProseMirror .mention) {
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .12);
+  background: rgb(94 106 210 / .12);
   border-radius: 3px;
   padding: 0 3px;
   font-weight: 500;
@@ -757,7 +757,7 @@ onMounted(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgb(103 232 249 / .14);
+  background: rgb(94 106 210 / .14);
   pointer-events: none;
   border: 1px solid var(--ds-color-accent);
 }

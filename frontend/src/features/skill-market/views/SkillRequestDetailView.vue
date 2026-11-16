@@ -801,7 +801,7 @@ onBeforeUnmount(() => {
 }
 .srd-skel {
   border-radius: var(--ds-radius-sm);
-  background: linear-gradient(90deg, rgb(133 234 255 / .08), rgb(133 234 255 / .16), rgb(133 234 255 / .08));
+  background: linear-gradient(90deg, rgb(255 255 255 / .08), rgb(255 255 255 / .16), rgb(255 255 255 / .08));
   background-size: 200% 100%;
   animation: srd-shimmer 1.4s ease-in-out infinite;
 }
@@ -907,12 +907,12 @@ onBeforeUnmount(() => {
   transition: background var(--ds-duration-fast) ease, color var(--ds-duration-fast) ease;
 }
 .srd-kebab-btn.is-open {
-  background: rgb(103 232 249 / .10);
+  background: rgb(94 106 210 / .10);
   color: var(--ds-color-text-primary);
 }
 @media (hover: hover) {
   .srd-kebab-btn:hover {
-    background: rgb(103 232 249 / .10);
+    background: rgb(94 106 210 / .10);
     color: var(--ds-color-text-primary);
   }
 }
@@ -952,7 +952,7 @@ onBeforeUnmount(() => {
 }
 @media (hover: hover) {
   .srd-kebab-item:hover {
-    background: rgb(103 232 249 / .10);
+    background: rgb(94 106 210 / .10);
     color: var(--ds-color-text-primary);
   }
   .srd-kebab-danger:hover {
@@ -1114,7 +1114,7 @@ onBeforeUnmount(() => {
 }
 @media (hover: hover) {
   .srd-action:not(.srd-action--static):hover {
-    background: rgb(103 232 249 / .08);
+    background: rgb(94 106 210 / .08);
     color: var(--ds-color-text-primary);
   }
 }
@@ -1217,7 +1217,7 @@ onBeforeUnmount(() => {
   transition: border-color var(--ds-duration-fast) ease, box-shadow var(--ds-duration-fast) ease;
 }
 .srd-composer:focus-within {
-  border-color: rgb(103 232 249 / .42);
+  border-color: rgb(94 106 210 / .42);
   box-shadow: var(--ds-shadow-glow);
 }
 .srd-composer-body {
@@ -1274,8 +1274,8 @@ onBeforeUnmount(() => {
   gap: 6px;
   font: 13px var(--ds-font-mono);
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .07);
-  border: 1px solid rgb(103 232 249 / .24);
+  background: rgb(94 106 210 / .07);
+  border: 1px solid rgb(94 106 210 / .24);
   padding: 5px 8px;
   border-radius: 5px;
   width: fit-content;
@@ -1459,7 +1459,7 @@ onBeforeUnmount(() => {
   padding: 4px 10px;
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 12.5px;
   cursor: pointer;

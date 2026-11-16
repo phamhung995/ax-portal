@@ -34,7 +34,7 @@ const extra = () => Math.max(0, props.items.length - 2)
   max-width: 190px;
 }
 .bs--category :deep(.p-badge) {
-  color: var(--ds-color-violet-400, #a58aef);
+  color: var(--ds-color-violet-400, #8b93e8);
   background: rgb(165 138 239 / .08);
   border-color: rgb(165 138 239 / .35);
 }

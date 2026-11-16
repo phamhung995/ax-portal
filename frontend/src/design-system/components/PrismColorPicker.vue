@@ -2,7 +2,7 @@
 import { computed, ref, useId, watch } from 'vue'
 import PrismFormField from './PrismFormField.vue'
 import { useFloatingPanel } from '../useFloatingPanel.js'
-const props = defineProps({ modelValue: { type: String, default: '#67e8f9' }, id: String, label: String, hint: String, error: String, disabled: Boolean, required: Boolean, presets: { type: Array, default: () => ['#67e8f9', '#a58aef', '#9ce8d0', '#f3d28c', '#ffacc4', '#38bdf8', '#f472b6', '#facc15'] } })
+const props = defineProps({ modelValue: { type: String, default: '#5e6ad2' }, id: String, label: String, hint: String, error: String, disabled: Boolean, required: Boolean, presets: { type: Array, default: () => ['#5e6ad2', '#8b93e8', '#4cc38a', '#e5a100', '#e5534b', '#ffffff', '#9a9da6', '#14161a'] } })
 const emit = defineEmits(['update:modelValue'])
 const generatedId = useId()
 const controlRef = ref(null)
@@ -48,7 +48,7 @@ function hslToHex(h, s, l) {
   return rgbToHex(conv(h + 1 / 3) * 255, conv(h) * 255, conv(h - 1 / 3) * 255)
 }
 const current = computed(() => {
-  const rgb = hexToRgb(props.modelValue) || { r: 103, g: 232, b: 249 }
+  const rgb = hexToRgb(props.modelValue) || { r: 94, g: 106, b: 210 }
   return { ...rgb, ...rgbToHsl(rgb.r, rgb.g, rgb.b) }
 })
 function commit(value) {

@@ -776,7 +776,7 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 .ainews-search-toggle:hover {
-  background: rgb(154 182 219 / .08);
+  background: rgb(154 157 166 / .08);
   color: var(--ds-color-text-primary);
 }
 .ainews-search-toggle > svg:first-child {
@@ -791,8 +791,8 @@ onBeforeUnmount(() => {
 .ainews-search-badge {
   font-size: 11px;
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .1);
-  border: 1px solid rgb(103 232 249 / .25);
+  background: rgb(94 106 210 / .1);
+  border: 1px solid rgb(94 106 210 / .25);
   border-radius: 999px;
   padding: 1px 8px;
   white-space: nowrap;
@@ -802,7 +802,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 10px;
   padding: 4px 14px 14px;
-  border-top: 1px solid rgb(154 182 219 / .1);
+  border-top: 1px solid rgb(154 157 166 / .1);
 }
 /* Hàng 1: 4 search box chia đều 1 hàng (Title, Sender, From, To) */
 .ainews-search-row {
@@ -870,7 +870,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border: 1px solid rgb(154 182 219 / .2);
+  border: 1px solid rgb(154 157 166 / .2);
   border-radius: 999px;
   background: none;
   color: var(--ds-color-text-secondary);
@@ -879,7 +879,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .ainews-grid-sort-btn:hover {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
   color: var(--ds-color-text-primary);
 }
 .ainews-grid-sort-menu {
@@ -911,7 +911,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .ainews-grid-sort-menu button:hover {
-  background: rgb(154 182 219 / .12);
+  background: rgb(154 157 166 / .12);
   color: var(--ds-color-text-primary);
 }
 .ainews-grid-sort-menu button.is-active {
@@ -1014,7 +1014,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
 }
-.ai-news--accent .ai-news-dot { border-color: var(--ds-color-accent); box-shadow: 0 0 8px rgb(103 232 249 / .4); }
+.ai-news--accent .ai-news-dot { border-color: var(--ds-color-accent); box-shadow: 0 0 8px rgb(94 106 210 / .4); }
 .ai-news--accent::after { background: var(--ds-color-accent); }
 .ai-news--violet .ai-news-dot { border-color: var(--ds-color-violet-400); box-shadow: 0 0 8px rgb(165 138 239 / .35); }
 .ai-news--violet::after { background: var(--ds-color-violet-400); }
@@ -1022,7 +1022,7 @@ onBeforeUnmount(() => {
 .ai-news--success::after { background: var(--ds-color-success); }
 .ai-news--warning .ai-news-dot { border-color: var(--ds-color-warning); box-shadow: 0 0 8px rgb(243 210 140 / .3); }
 .ai-news--warning::after { background: var(--ds-color-warning); }
-.ai-news--teal .ai-news-dot { border-color: var(--ds-color-teal-400); box-shadow: 0 0 8px rgb(73 220 207 / .3); }
+.ai-news--teal .ai-news-dot { border-color: var(--ds-color-teal-400); box-shadow: 0 0 8px rgb(94 106 210 / .3); }
 .ai-news--teal::after { background: var(--ds-color-teal-400); }
 .ai-news--rose .ai-news-dot { border-color: var(--ds-color-rose-300); box-shadow: 0 0 8px rgb(255 172 196 / .3); }
 .ai-news--rose::after { background: var(--ds-color-rose-300); }
@@ -1070,7 +1070,7 @@ onBeforeUnmount(() => {
   color: var(--ds-color-accent);
 }
 .ai-news-item.selected .ai-news-dot {
-  box-shadow: 0 0 8px rgb(103 232 249 / .4);
+  box-shadow: 0 0 8px rgb(94 106 210 / .4);
 }
 .ai-news-skeleton {
   display: flex;

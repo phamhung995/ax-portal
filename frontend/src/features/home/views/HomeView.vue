@@ -172,7 +172,7 @@ type ChartPeriod = '1m' | '3m' | '6m' | '1y'
 type ChartDimension = 'group' | 'part'
 
 const CHART_PERIODS: ChartPeriod[] = ['1m', '3m', '6m', '1y']
-const CHART_COLORS = ['#67e8f9', '#a58aef', '#9ce8d0', '#f2c879', '#f28bb0', '#f28bb0', '#67e8f9', '#a58aef']
+const CHART_COLORS = ['#5e6ad2', '#8b93e8', '#4cc38a', '#f2c879', '#f28bb0', '#f28bb0', '#5e6ad2', '#8b93e8']
 
 const chartPeriod = ref<ChartPeriod>('1y')
 const chartDimension = ref<ChartDimension>('group')
@@ -1130,7 +1130,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .chart-filter-bar .seg button.active {
-  background: rgb(103 232 249 / .15);
+  background: rgb(94 106 210 / .15);
   color: var(--ds-color-accent);
   font-weight: 600;
 }
@@ -1538,7 +1538,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 14px 16px;
-  border-bottom: 1px solid rgb(154 182 219 / .1);
+  border-bottom: 1px solid rgb(154 157 166 / .1);
 }
 .community-card :deep(h3) {
   margin: 0;
@@ -1566,7 +1566,7 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 12px 16px;
   border: none;
-  border-bottom: 1px solid rgb(154 182 219 / .07);
+  border-bottom: 1px solid rgb(154 157 166 / .07);
   background: none;
   cursor: pointer;
   text-align: left;
@@ -1576,7 +1576,7 @@ onBeforeUnmount(() => {
 }
 @media (hover: hover) {
   .skill-row:hover {
-    background: rgb(103 232 249 / .045);
+    background: rgb(94 106 210 / .045);
   }
 }
 .skill-row .row-main {
@@ -1613,8 +1613,8 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   font: 700 12px var(--ds-font-mono);
   color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .1);
-  border: 1px solid rgb(103 232 249 / .25);
+  background: rgb(94 106 210 / .1);
+  border: 1px solid rgb(94 106 210 / .25);
 }
 .skill-name {
   flex: 1;
@@ -1649,8 +1649,8 @@ onBeforeUnmount(() => {
   font-size: 11px;
   line-height: 16px;
   color: var(--ds-color-text-secondary);
-  background: rgb(154 182 219 / .08);
-  border: 1px solid rgb(154 182 219 / .18);
+  background: rgb(154 157 166 / .08);
+  border: 1px solid rgb(154 157 166 / .18);
 }
 .skill-tag--cat {
   color: var(--ds-color-violet-400);
@@ -1659,8 +1659,8 @@ onBeforeUnmount(() => {
 }
 .skill-tag--stage {
   color: var(--ds-color-teal-400);
-  background: rgb(73 220 207 / .1);
-  border-color: rgb(73 220 207 / .3);
+  background: rgb(94 106 210 / .1);
+  border-color: rgb(94 106 210 / .3);
 }
 .skill-tag--more {
   color: var(--ds-color-text-muted);
@@ -1713,7 +1713,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
 }
-.home-ainews--accent .home-ainews-dot { border-color: var(--ds-color-accent); box-shadow: 0 0 8px rgb(103 232 249 / .4); }
+.home-ainews--accent .home-ainews-dot { border-color: var(--ds-color-accent); box-shadow: 0 0 8px rgb(94 106 210 / .4); }
 .home-ainews--accent::after { background: var(--ds-color-accent); }
 .home-ainews--violet .home-ainews-dot { border-color: var(--ds-color-violet-400); box-shadow: 0 0 8px rgb(165 138 239 / .35); }
 .home-ainews--violet::after { background: var(--ds-color-violet-400); }
@@ -1721,7 +1721,7 @@ onBeforeUnmount(() => {
 .home-ainews--success::after { background: var(--ds-color-success); }
 .home-ainews--warning .home-ainews-dot { border-color: var(--ds-color-warning); box-shadow: 0 0 8px rgb(243 210 140 / .3); }
 .home-ainews--warning::after { background: var(--ds-color-warning); }
-.home-ainews--teal .home-ainews-dot { border-color: var(--ds-color-teal-400); box-shadow: 0 0 8px rgb(73 220 207 / .3); }
+.home-ainews--teal .home-ainews-dot { border-color: var(--ds-color-teal-400); box-shadow: 0 0 8px rgb(94 106 210 / .3); }
 .home-ainews--teal::after { background: var(--ds-color-teal-400); }
 .home-ainews--rose .home-ainews-dot { border-color: var(--ds-color-rose-300); box-shadow: 0 0 8px rgb(255 172 196 / .3); }
 .home-ainews--rose::after { background: var(--ds-color-rose-300); }
@@ -1798,7 +1798,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 14px 16px;
-  border-bottom: 1px solid rgb(154 182 219 / .1);
+  border-bottom: 1px solid rgb(154 157 166 / .1);
 }
 .bottom-card :deep(h3) {
   margin: 0;

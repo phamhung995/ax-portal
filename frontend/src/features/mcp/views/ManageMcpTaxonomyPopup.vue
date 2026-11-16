@@ -383,7 +383,7 @@ function close() {
   border-radius: 50%;
 }
 .mgt-dot--cat {
-  background: var(--ds-color-violet-400, #a58aef);
+  background: var(--ds-color-violet-400, #8b93e8);
 }
 .mgt-dot--stage {
   background: var(--ds-color-accent);
@@ -473,7 +473,7 @@ function close() {
 @media (hover: hover) {
   .mgt-edit:hover {
     color: var(--ds-color-accent);
-    background: rgb(103 232 249 / .08);
+    background: rgb(94 106 210 / .08);
   }
 }
 .mgt-edit-form {

@@ -353,7 +353,7 @@ defineExpose({ addMcpsFromDetails, refresh, initFromExisting })
   outline: none;
   border-color: var(--ds-color-accent);
   background: var(--ds-input-focus-background);
-  box-shadow: 0 0 0 3px rgb(103 232 249 / .10), 0 0 14px rgb(103 232 249 / .05);
+  box-shadow: 0 0 0 3px rgb(94 106 210 / .10), 0 0 14px rgb(94 106 210 / .05);
 }
 .mcp-dep-input-btn.is-readonly {
   cursor: default;
@@ -381,7 +381,7 @@ defineExpose({ addMcpsFromDetails, refresh, initFromExisting })
   padding: 2px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
 }
 /* v1.25 (Q-18 exception) → v1.30: chip border theo status cho MỌI chip
    (APPROVED = success/mint, PENDING = warning, REJECTED = danger, DRAFT = neutral) */

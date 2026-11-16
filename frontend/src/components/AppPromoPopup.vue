@@ -105,7 +105,7 @@ onBeforeUnmount(() => element.value?.close())
   border-radius: var(--ds-radius-lg);
   box-shadow: var(--ds-shadow-glass), 0 24px 64px rgb(3 5 23 / 0.5);
   background:
-    radial-gradient(300px 140px at 50% -20%, rgb(103 232 249 / 0.22), transparent 70%),
+    radial-gradient(300px 140px at 50% -20%, rgb(94 106 210 / 0.22), transparent 70%),
     radial-gradient(260px 160px at 90% 110%, rgb(165 138 239 / 0.18), transparent 70%),
     var(--ds-dialog-background, rgb(15 32 62 / 0.96));
 }
@@ -179,8 +179,8 @@ onBeforeUnmount(() => element.value?.close())
   align-items: center;
   justify-content: center;
   gap: 9px;
-  border: 1px solid rgb(103 232 249 / 0.55);
-  background: linear-gradient(180deg, rgb(103 232 249 / 0.3), rgb(103 232 249 / 0.14));
+  border: 1px solid rgb(94 106 210 / 0.55);
+  background: linear-gradient(180deg, rgb(94 106 210 / 0.3), rgb(94 106 210 / 0.14));
   color: var(--ds-color-text-primary);
   font: 700 15px var(--ds-font-sans);
   padding: 13px 24px;

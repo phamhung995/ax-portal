@@ -447,7 +447,7 @@ function confirmDiscard() {
 }
 .add-attach-drop.is-dragover {
   border-color: var(--ds-color-accent);
-  background: rgb(103 232 249 / .08);
+  background: rgb(94 106 210 / .08);
 }
 .add-attach-files {
   display: grid;
@@ -529,7 +529,7 @@ function confirmDiscard() {
   padding: 2px var(--ds-space-2);
   border: 1px solid var(--ds-color-border);
   border-radius: 20px;
-  background: rgb(103 232 249 / .06);
+  background: rgb(94 106 210 / .06);
   color: var(--ds-color-text-secondary);
   font-size: 13px;
 }
