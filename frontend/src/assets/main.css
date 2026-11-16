@@ -19,8 +19,8 @@ body,
 #app {
   height: 100%;
   margin: 0;
-  background: var(--ds-color-canvas, #100d2b);
-  color: var(--ds-color-text-primary, #f4f8fc);
+  background: var(--ds-color-canvas, #08090a);
+  color: var(--ds-color-text-primary, #e8e9eb);
   font-family: var(--ds-font-sans, 'Inter', system-ui, sans-serif);
   font-size: 14px;
   line-height: 1.43;
@@ -31,7 +31,7 @@ body,
 }
 
 a {
-  color: var(--ds-color-accent, #67e8f9);
+  color: var(--ds-color-accent, #5e6ad2);
   text-decoration: none;
 }
 

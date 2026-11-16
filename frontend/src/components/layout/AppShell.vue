@@ -648,6 +648,7 @@ const avatarSrc = computed(() => auth.user?.avatarUrl ?? undefined)
   display: flex;
   flex-direction: column;
   position: relative;
+  background: var(--ds-color-canvas);
 }
 
 .nx-header {
@@ -660,8 +661,8 @@ const avatarSrc = computed(() => auth.user?.avatarUrl ?? undefined)
   gap: var(--ds-space-4);
   padding: 0 var(--ds-space-4);
   border-bottom: 1px solid var(--ds-color-border);
-  background: rgb(16 13 43 / 0.72);
-  backdrop-filter: blur(10px) saturate(120%);
+  /* v2.0 Linear: flat header on the same plane as the background — no blur/glass. */
+  background: var(--ds-color-canvas);
 }
 
 .nx-menu-toggle {
@@ -935,13 +936,15 @@ const avatarSrc = computed(() => auth.user?.avatarUrl ?? undefined)
   width: var(--nx-app-sidebar-width);
   flex-shrink: 0;
   padding: var(--ds-space-4) var(--ds-space-3);
-  border-right: 1px solid var(--ds-color-border);
-  background: rgb(16 13 43 / 0.5);
+  /* v2.0 Linear layer 0: sidebar is flat on the same plane as the background —
+     same colour, no border, no shadow, no radius. */
+  border-right: none;
+  background: var(--ds-color-canvas);
   position: sticky;
   top: var(--nx-app-header-height);
   height: calc(100vh - var(--nx-app-header-height));
   overflow-y: auto;
-  z-index: 1;
+  z-index: var(--ds-z-sidebar, 0);
 }
 @media (min-width: 1536px) {
   .nx-sidebar {
@@ -983,7 +986,6 @@ const avatarSrc = computed(() => auth.user?.avatarUrl ?? undefined)
   width: 3px;
   border-radius: 2px;
   background: var(--ds-color-accent);
-  box-shadow: var(--ds-shadow-glow);
 }
 .nx-nav-item.is-placeholder {
   opacity: 0.55;
@@ -1022,7 +1024,13 @@ const avatarSrc = computed(() => auth.user?.avatarUrl ?? undefined)
   min-width: 0;
   padding: var(--ds-space-4);
   position: relative;
-  z-index: 1;
+  /* v2.0 Linear layer 1: the main content is ONE elevated card. */
+  z-index: var(--ds-z-main, 10);
+  margin: 10px;
+  background: var(--ds-color-surface);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-card);
 }
 /* Introduction page: no padding — the embedded page manages its own spacing. */
 .nx-main--intro {
