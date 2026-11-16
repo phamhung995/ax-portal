@@ -613,7 +613,7 @@ onMounted(() => {
   padding: 3px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
-  background: var(--ds-color-bg-primary, #12121a);
+  background: var(--ds-color-bg-primary, #14161a);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   z-index: 10;
 }

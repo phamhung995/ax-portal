@@ -1041,7 +1041,7 @@ const avatarSrc = computed(() => auth.user?.avatarUrl ?? undefined)
   position: fixed;
   inset: var(--nx-app-header-height) 0 0 0;
   z-index: 45;
-  background: rgb(5 8 26 / 0.5);
+  background: rgb(0 0 0 / 0.5);
 }
 
 @media (max-width: 1199px) {

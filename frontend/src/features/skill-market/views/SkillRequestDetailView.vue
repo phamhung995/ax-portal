@@ -801,7 +801,7 @@ onBeforeUnmount(() => {
 }
 .srd-skel {
   border-radius: var(--ds-radius-sm);
-  background: linear-gradient(90deg, rgb(255 255 255 / .08), rgb(255 255 255 / .16), rgb(255 255 255 / .08));
+  background: rgb(255 255 255 / .12);
   background-size: 200% 100%;
   animation: srd-shimmer 1.4s ease-in-out infinite;
 }
@@ -956,7 +956,7 @@ onBeforeUnmount(() => {
     color: var(--ds-color-text-primary);
   }
   .srd-kebab-danger:hover {
-    background: rgb(255 172 196 / .12);
+    background: rgb(229 83 75 / .12);
     color: var(--ds-color-danger);
   }
 }
@@ -1048,18 +1048,18 @@ onBeforeUnmount(() => {
   gap: 6px;
   font: 12px var(--ds-font-mono);
   padding: 3px 9px;
-  border: 1px solid rgb(156 232 208 / .30);
+  border: 1px solid rgb(76 195 138 / .30);
   border-radius: 6px;
   color: var(--ds-color-success);
-  background: rgb(156 232 208 / .07);
+  background: rgb(76 195 138 / .07);
   cursor: pointer;
   white-space: nowrap;
   transition: border-color var(--ds-duration-fast) ease, background var(--ds-duration-fast) ease;
 }
 @media (hover: hover) {
   .resolved-chip:hover {
-    border-color: rgb(156 232 208 / .55);
-    background: rgb(156 232 208 / .14);
+    border-color: rgb(76 195 138 / .55);
+    background: rgb(76 195 138 / .14);
   }
 }
 .resolved-more {
@@ -1079,15 +1079,15 @@ onBeforeUnmount(() => {
 }
 .resolved-status.is-success {
   color: var(--ds-color-success);
-  border-color: rgb(156 232 208 / .35);
+  border-color: rgb(76 195 138 / .35);
 }
 .resolved-status.is-warning {
   color: var(--ds-color-warning);
-  border-color: rgb(243 210 140 / .35);
+  border-color: rgb(229 161 0 / .35);
 }
 .resolved-status.is-danger {
   color: var(--ds-color-danger);
-  border-color: rgb(255 172 196 / .35);
+  border-color: rgb(229 83 75 / .35);
 }
 
 /* Action bar: flat icon buttons (variant B) */
@@ -1218,7 +1218,7 @@ onBeforeUnmount(() => {
 }
 .srd-composer:focus-within {
   border-color: rgb(94 106 210 / .42);
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
 }
 .srd-composer-body {
   flex: 1;

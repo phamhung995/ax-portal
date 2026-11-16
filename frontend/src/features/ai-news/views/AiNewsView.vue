@@ -758,7 +758,7 @@ onBeforeUnmount(() => {
 .ainews-search {
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-md);
-  background: rgb(9 20 45 / .25);
+  background: rgb(255 255 255 / .25);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -894,7 +894,7 @@ onBeforeUnmount(() => {
   min-width: 130px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
-  background: rgb(9 20 45 / .98);
+  background: rgb(255 255 255 / .98);
   box-shadow: 0 6px 20px rgb(0 0 0 / .4);
 }
 .ainews-grid-sort-menu button {
@@ -1014,17 +1014,17 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
 }
-.ai-news--accent .ai-news-dot { border-color: var(--ds-color-accent); box-shadow: 0 0 8px rgb(94 106 210 / .4); }
+.ai-news--accent .ai-news-dot { border-color: var(--ds-color-accent); box-shadow: none; }
 .ai-news--accent::after { background: var(--ds-color-accent); }
-.ai-news--violet .ai-news-dot { border-color: var(--ds-color-violet-400); box-shadow: 0 0 8px rgb(165 138 239 / .35); }
+.ai-news--violet .ai-news-dot { border-color: var(--ds-color-violet-400); box-shadow: none; }
 .ai-news--violet::after { background: var(--ds-color-violet-400); }
-.ai-news--success .ai-news-dot { border-color: var(--ds-color-success); box-shadow: 0 0 8px rgb(156 232 208 / .3); }
+.ai-news--success .ai-news-dot { border-color: var(--ds-color-success); box-shadow: none; }
 .ai-news--success::after { background: var(--ds-color-success); }
-.ai-news--warning .ai-news-dot { border-color: var(--ds-color-warning); box-shadow: 0 0 8px rgb(243 210 140 / .3); }
+.ai-news--warning .ai-news-dot { border-color: var(--ds-color-warning); box-shadow: none; }
 .ai-news--warning::after { background: var(--ds-color-warning); }
-.ai-news--teal .ai-news-dot { border-color: var(--ds-color-teal-400); box-shadow: 0 0 8px rgb(94 106 210 / .3); }
+.ai-news--teal .ai-news-dot { border-color: var(--ds-color-teal-400); box-shadow: none; }
 .ai-news--teal::after { background: var(--ds-color-teal-400); }
-.ai-news--rose .ai-news-dot { border-color: var(--ds-color-rose-300); box-shadow: 0 0 8px rgb(255 172 196 / .3); }
+.ai-news--rose .ai-news-dot { border-color: var(--ds-color-rose-300); box-shadow: none; }
 .ai-news--rose::after { background: var(--ds-color-rose-300); }
 .ai-news-body {
   min-width: 0;
@@ -1070,7 +1070,7 @@ onBeforeUnmount(() => {
   color: var(--ds-color-accent);
 }
 .ai-news-item.selected .ai-news-dot {
-  box-shadow: 0 0 8px rgb(94 106 210 / .4);
+  box-shadow: none;
 }
 .ai-news-skeleton {
   display: flex;

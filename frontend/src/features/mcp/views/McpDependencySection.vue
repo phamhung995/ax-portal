@@ -353,7 +353,7 @@ defineExpose({ addMcpsFromDetails, refresh, initFromExisting })
   outline: none;
   border-color: var(--ds-color-accent);
   background: var(--ds-input-focus-background);
-  box-shadow: 0 0 0 3px rgb(94 106 210 / .10), 0 0 14px rgb(94 106 210 / .05);
+  box-shadow: 0 0 0 3px rgb(94 106 210 / .10);
 }
 .mcp-dep-input-btn.is-readonly {
   cursor: default;

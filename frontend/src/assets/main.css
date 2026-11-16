@@ -263,7 +263,7 @@ input[type='checkbox']:disabled {
 .p-label {
   font-weight: 500;
   color: var(--ds-color-text-secondary);
-  font-size: 16px;
+  font-size: 14px;
 }
 /* Combobox dropdown panels opened from a search area are teleported to
    <body> (tagged .search-combobox-panel by AppShell) — compact them to match

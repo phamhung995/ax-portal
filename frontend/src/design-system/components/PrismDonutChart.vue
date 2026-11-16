@@ -10,7 +10,7 @@ const props = defineProps<{
   centerDetail?: boolean
   ariaLabel?: string
 }>()
-const COLORS = ['var(--ds-color-accent)', 'var(--ds-color-violet-400)', 'var(--ds-color-teal-400)', 'var(--ds-color-mint-300)', 'var(--ds-color-amber-300)', 'var(--ds-color-rose-300)']
+const COLORS = ['var(--ds-color-accent)', 'var(--ds-color-violet-400)', '#a8aee9', '#6b6f78', '#9a9da6', '#4a4f68']
 const chart = computed(() => {
   const data = props.data ?? []
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0) || 1

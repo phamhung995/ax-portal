@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
     background: rgb(94 106 210 / .08);
     border-color: var(--ds-color-border-strong);
     color: var(--ds-color-text-secondary);
-    box-shadow: var(--ds-shadow-glow);
+    box-shadow: var(--ds-shadow-card);
   }
 }
 
@@ -482,7 +482,7 @@ onBeforeUnmount(() => {
 .search-input:focus {
   border-color: rgb(94 106 210 / .42);
   background: rgb(8 9 10 / .72);
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
 }
 .search-wrap:focus-within .search-icon {
   color: var(--ds-color-accent);

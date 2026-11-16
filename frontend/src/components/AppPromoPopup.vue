@@ -103,15 +103,12 @@ onBeforeUnmount(() => element.value?.close())
   padding: 0;
   border: 1px solid var(--ds-color-border-strong);
   border-radius: var(--ds-radius-lg);
-  box-shadow: var(--ds-shadow-glass), 0 24px 64px rgb(3 5 23 / 0.5);
-  background:
-    radial-gradient(300px 140px at 50% -20%, rgb(94 106 210 / 0.22), transparent 70%),
-    radial-gradient(260px 160px at 90% 110%, rgb(165 138 239 / 0.18), transparent 70%),
-    var(--ds-dialog-background, rgb(15 32 62 / 0.96));
+  box-shadow: var(--ds-shadow-glass), 0 24px 64px rgb(0 0 0 / 0.5);
+  background: var(--ds-dialog-background);
 }
 .app-promo::backdrop {
-  background: rgb(5 8 26 / 0.55);
-  backdrop-filter: blur(2px);
+  background: rgb(0 0 0 / 0.55);
+  /* v2.0: no backdrop blur */
 }
 .app-promo-close {
   position: absolute;
@@ -155,11 +152,11 @@ onBeforeUnmount(() => element.value?.close())
 }
 .app-promo-badge-new {
   color: var(--ds-color-space-950);
-  background: linear-gradient(90deg, var(--ds-color-accent), var(--ds-color-success));
+  background: var(--ds-color-accent);
 }
 .app-promo-badge-free {
   color: var(--ds-color-space-950);
-  background: linear-gradient(90deg, var(--ds-color-warning), var(--ds-color-success));
+  background: var(--ds-color-warning);
 }
 .app-promo-title {
   font-size: 21px;
@@ -180,13 +177,13 @@ onBeforeUnmount(() => element.value?.close())
   justify-content: center;
   gap: 9px;
   border: 1px solid rgb(94 106 210 / 0.55);
-  background: linear-gradient(180deg, rgb(94 106 210 / 0.3), rgb(94 106 210 / 0.14));
+  background: rgb(94 106 210 / 0.2);
   color: var(--ds-color-text-primary);
   font: 700 15px var(--ds-font-sans);
   padding: 13px 24px;
-  border-radius: 28px;
+  border-radius: var(--ds-radius-md);
   cursor: pointer;
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 .app-promo-cta:hover {
@@ -202,7 +199,7 @@ onBeforeUnmount(() => element.value?.close())
   justify-content: center;
   padding: 12px 0;
   border-top: 1px solid var(--ds-color-border);
-  background: rgb(9 20 45 / 0.35);
+  background: rgb(255 255 255 / 0.35);
 }
 .app-promo-noagain {
   display: flex;

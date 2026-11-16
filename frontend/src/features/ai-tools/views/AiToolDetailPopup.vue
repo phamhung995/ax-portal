@@ -219,8 +219,8 @@ async function confirmDelete() {
 }
 .dtl-badge--cat {
   color: var(--ds-color-violet-400, #8b93e8);
-  background: rgb(165 138 239 / .08);
-  border: 1px solid rgb(165 138 239 / .35);
+  background: rgb(94 106 210 / .08);
+  border: 1px solid rgb(94 106 210 / .35);
 }
 .dtl-badge--stage {
   color: var(--ds-color-accent);

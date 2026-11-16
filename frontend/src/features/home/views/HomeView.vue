@@ -172,7 +172,7 @@ type ChartPeriod = '1m' | '3m' | '6m' | '1y'
 type ChartDimension = 'group' | 'part'
 
 const CHART_PERIODS: ChartPeriod[] = ['1m', '3m', '6m', '1y']
-const CHART_COLORS = ['#5e6ad2', '#8b93e8', '#4cc38a', '#f2c879', '#f28bb0', '#f28bb0', '#5e6ad2', '#8b93e8']
+const CHART_COLORS = ['#5e6ad2', '#8b93e8', '#a8aee9', '#6b6f78', '#9a9da6', '#4a4f68', '#5e6ad2', '#8b93e8']
 
 const chartPeriod = ref<ChartPeriod>('1y')
 const chartDimension = ref<ChartDimension>('group')
@@ -1035,7 +1035,7 @@ onBeforeUnmount(() => {
 /* Interactive robot banner — background layer behind the tab content.
    The iframe page is self-contained (public/home-banner/). Height is set
    at runtime by syncBannerHeight() (top of .home → bottom of the KPI
-   region, both tabs); the CSS value is only the initial fallback.
+   region, both tabs), but v2.0 caps it at 120px via max-height below.
    The iframe itself receives pointer events (so the robot is interactive,
    like the v3 demo) — the tab content above it is click-through instead
    (see .home > .p-tabs below). */
@@ -1044,10 +1044,15 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: clamp(180px, 22vh, 230px);
+  /* v2.0 Linear: the robot banner is a compact 120px strip, not a full
+     hero. syncBannerHeight() still sets an inline height from the KPI
+     region, but max-height caps it — the robot stays interactive (it is
+     the chatbot's face) while the page below it sits on the flat canvas. */
+  height: 120px;
+  max-height: 120px;
   z-index: 0;
   border: 0;
-  background: #090626;
+  background: #08090a;
   /* The height is set at runtime by syncBannerHeight() — without a
      transition the iframe jumps from the CSS fallback (180–230px) to the
      KPI-anchored height in one frame, and the robot visibly resizes
@@ -1179,7 +1184,7 @@ onBeforeUnmount(() => {
    border only — so the home banner stays clearly visible through them. */
 .chart-filter-bar,
 .chart-kpi {
-  background: rgb(24 55 92 / .05);
+  background: rgb(255 255 255 / .05);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
@@ -1304,7 +1309,7 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-md);
-  background: rgb(9 20 45 / .3);
+  background: rgb(255 255 255 / .3);
 }
 /* Let the radar SVG fill the cell width and ZOOM it: the design-system
    viewBox is 2:1 (wide) to leave room for the left/right axis labels, so
@@ -1364,7 +1369,7 @@ onBeforeUnmount(() => {
 .radar-mtrack {
   grid-column: 1 / 3;
   height: 3px;
-  background: rgb(9 20 45 / .6);
+  background: rgb(255 255 255 / .6);
   border-radius: 2px;
   overflow: hidden;
   margin-top: -1px;
@@ -1480,7 +1485,7 @@ onBeforeUnmount(() => {
 }
 .kpi-card:hover {
   border-color: var(--ds-color-border-strong);
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
 }
 .kpi-label {
   font-size: 12px;
@@ -1654,8 +1659,8 @@ onBeforeUnmount(() => {
 }
 .skill-tag--cat {
   color: var(--ds-color-violet-400);
-  background: rgb(165 138 239 / .1);
-  border-color: rgb(165 138 239 / .3);
+  background: rgb(94 106 210 / .1);
+  border-color: rgb(94 106 210 / .3);
 }
 .skill-tag--stage {
   color: var(--ds-color-teal-400);
@@ -1713,17 +1718,17 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
 }
-.home-ainews--accent .home-ainews-dot { border-color: var(--ds-color-accent); box-shadow: 0 0 8px rgb(94 106 210 / .4); }
+.home-ainews--accent .home-ainews-dot { border-color: var(--ds-color-accent); box-shadow: none; }
 .home-ainews--accent::after { background: var(--ds-color-accent); }
-.home-ainews--violet .home-ainews-dot { border-color: var(--ds-color-violet-400); box-shadow: 0 0 8px rgb(165 138 239 / .35); }
+.home-ainews--violet .home-ainews-dot { border-color: var(--ds-color-violet-400); box-shadow: none; }
 .home-ainews--violet::after { background: var(--ds-color-violet-400); }
-.home-ainews--success .home-ainews-dot { border-color: var(--ds-color-success); box-shadow: 0 0 8px rgb(156 232 208 / .3); }
+.home-ainews--success .home-ainews-dot { border-color: var(--ds-color-success); box-shadow: none; }
 .home-ainews--success::after { background: var(--ds-color-success); }
-.home-ainews--warning .home-ainews-dot { border-color: var(--ds-color-warning); box-shadow: 0 0 8px rgb(243 210 140 / .3); }
+.home-ainews--warning .home-ainews-dot { border-color: var(--ds-color-warning); box-shadow: none; }
 .home-ainews--warning::after { background: var(--ds-color-warning); }
-.home-ainews--teal .home-ainews-dot { border-color: var(--ds-color-teal-400); box-shadow: 0 0 8px rgb(94 106 210 / .3); }
+.home-ainews--teal .home-ainews-dot { border-color: var(--ds-color-teal-400); box-shadow: none; }
 .home-ainews--teal::after { background: var(--ds-color-teal-400); }
-.home-ainews--rose .home-ainews-dot { border-color: var(--ds-color-rose-300); box-shadow: 0 0 8px rgb(255 172 196 / .3); }
+.home-ainews--rose .home-ainews-dot { border-color: var(--ds-color-rose-300); box-shadow: none; }
 .home-ainews--rose::after { background: var(--ds-color-rose-300); }
 .home-ainews-body {
   min-width: 0;

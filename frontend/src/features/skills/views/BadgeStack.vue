@@ -35,8 +35,8 @@ const extra = () => Math.max(0, props.items.length - 2)
 }
 .bs--category :deep(.p-badge) {
   color: var(--ds-color-violet-400, #8b93e8);
-  background: rgb(165 138 239 / .08);
-  border-color: rgb(165 138 239 / .35);
+  background: rgb(94 106 210 / .08);
+  border-color: rgb(94 106 210 / .35);
 }
 .bs-more {
   color: var(--ds-color-text-muted);

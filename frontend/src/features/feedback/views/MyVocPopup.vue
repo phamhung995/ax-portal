@@ -182,8 +182,8 @@ function openDetail(item: FeedbackItem) {
   margin: 0;
   padding: var(--ds-space-3);
   border-radius: var(--ds-radius-sm);
-  border: 1px solid var(--ds-color-danger, #f87171);
-  color: var(--ds-color-danger, #f87171);
+  border: 1px solid var(--ds-color-danger, #e5534b);
+  color: var(--ds-color-danger, #e5534b);
   font-size: 13px;
 }
 .voc-items {

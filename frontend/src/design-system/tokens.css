@@ -1,10 +1,10 @@
 :root {
   color-scheme: dark;
   /* AX-Portal Design System v2.0 — Linear style.
-   * Replaces the v1.x neon / glass / bokeh language.
+   * Replaces the v1.x neon / glass / photographic-background language.
    * Near-monochrome, one accent, quiet chrome.
    * Variable names (--ds-*) are kept so existing Prism components keep working;
-   * only their values change. Removed: bokeh, glass blur, glow shadows. */
+   * only their values change. Removed: photographic background, glass blur, glow shadows. */
   /* Global — neutrals (Linear-like, near-black) */
   --ds-color-space-950: #08090a;
   --ds-color-space-900: #14161a;

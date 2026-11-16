@@ -8,7 +8,7 @@ const props = defineProps({
   width: { type: Number, default: 480 },
   ariaLabel: { type: String, default: 'Biểu đồ cột chồng' },
 })
-const COLORS = ['var(--ds-color-accent)', 'var(--ds-color-violet-400)', 'var(--ds-color-teal-400)', 'var(--ds-color-amber-300)', 'var(--ds-color-rose-300)']
+const COLORS = ['var(--ds-color-accent)', 'var(--ds-color-violet-400)', '#a8aee9', '#6b6f78', '#9a9da6']
 const PAD = { top: 18, right: 8, bottom: 24, left: 8 }
 const chart = computed(() => {
   const W = props.width

@@ -383,7 +383,7 @@ button.skill-chip {
   color: var(--ds-color-accent);
 }
 .comment-action--danger:hover {
-  background: rgb(255 172 196 / .10);
+  background: rgb(229 83 75 / .10);
   color: var(--ds-color-danger);
 }
 .reply-form {
@@ -392,12 +392,12 @@ button.skill-chip {
   padding: var(--ds-space-3);
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-md);
-  background: rgb(9 20 45 / .35);
+  background: rgb(255 255 255 / .35);
   transition: border-color var(--ds-duration-fast) ease, box-shadow var(--ds-duration-fast) ease;
 }
 .reply-form:focus-within {
   border-color: rgb(94 106 210 / .42);
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
 }
 /* Merge the tiptap editor into the form (drop its own border/bg) */
 .reply-form :deep(.rte) {

@@ -1483,9 +1483,7 @@ async function toggleSubscribe() {
   padding: 14px 18px;
   border: 1px solid rgb(94 106 210 / .45);
   border-radius: var(--ds-radius-md);
-  background:
-    radial-gradient(300px 80px at 8% 0%, rgb(94 106 210 / .14), transparent 70%),
-    var(--ds-surface-tint);
+  background: var(--ds-surface-tint);
   cursor: pointer;
   transition: border-color var(--ds-duration-fast) var(--ds-ease),
     box-shadow var(--ds-duration-fast) var(--ds-ease);
@@ -1493,7 +1491,7 @@ async function toggleSubscribe() {
 @media (hover: hover) {
   .dtl-hero:hover {
     border-color: var(--ds-color-accent);
-    box-shadow: var(--ds-shadow-glow);
+    box-shadow: var(--ds-shadow-card);
   }
 }
 .dtl-hero:focus-visible {
@@ -1507,7 +1505,7 @@ async function toggleSubscribe() {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgb(94 106 210 / .3), rgb(94 106 210 / .12));
+  background: rgb(94 106 210 / 0.2);
   border: 1px solid rgb(94 106 210 / .5);
   color: var(--ds-color-text-primary);
 }
@@ -1559,11 +1557,11 @@ async function toggleSubscribe() {
   font: 700 14px var(--ds-font-sans);
   cursor: pointer;
   border: 1px solid rgb(94 106 210 / .55);
-  background: linear-gradient(180deg, rgb(94 106 210 / .3), rgb(94 106 210 / .14));
+  background: rgb(94 106 210 / 0.2);
   color: var(--ds-color-text-primary);
   padding: 10px 20px;
   border-radius: 10px;
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
   white-space: nowrap;
   transition: transform var(--ds-duration-fast) var(--ds-ease);
 }
@@ -1722,7 +1720,7 @@ async function toggleSubscribe() {
   .dtl-file-download.is-all:hover {
     background: rgb(94 106 210 / .18);
     border-color: var(--ds-color-accent);
-    box-shadow: var(--ds-shadow-glow);
+    box-shadow: var(--ds-shadow-card);
   }
 }
 .dtl-hashtags {
@@ -1767,8 +1765,8 @@ async function toggleSubscribe() {
 }
 .dtl-badge--cat {
   color: var(--ds-color-violet-400, #8b93e8);
-  background: rgb(165 138 239 / .08);
-  border: 1px solid rgb(165 138 239 / .35);
+  background: rgb(94 106 210 / .08);
+  border: 1px solid rgb(94 106 210 / .35);
 }
 .dtl-badge--stage {
   color: var(--ds-color-accent);
@@ -2261,7 +2259,7 @@ async function toggleSubscribe() {
 .dtl-mcp-status-badge {
   font-size: 11px;
   font-weight: 600;
-  color: var(--ds-color-warning, #fbbf24);
+  color: var(--ds-color-warning, #e5a100);
   border: 1px solid rgb(251 191 36 / .4);
   background: rgb(251 191 36 / .08);
   padding: 1px 8px;

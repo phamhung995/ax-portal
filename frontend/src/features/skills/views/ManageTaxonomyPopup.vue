@@ -458,7 +458,7 @@ function close() {
 @media (hover: hover) {
   .mgt-del:hover {
     color: var(--ds-color-danger);
-    background: rgb(255 172 196 / .08);
+    background: rgb(229 83 75 / .08);
   }
 }
 .mgt-edit {

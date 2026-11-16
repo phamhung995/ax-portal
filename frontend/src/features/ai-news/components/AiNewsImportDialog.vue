@@ -145,7 +145,7 @@ async function onImport() {
 .ainews-import-error {
   margin: 0;
   font-size: 13px;
-  color: var(--color-danger, #f87171);
+  color: var(--color-danger, #e5534b);
 }
 .ainews-import-results {
   margin: 0;
@@ -169,10 +169,10 @@ async function onImport() {
   color: var(--color-success, #34d399);
 }
 .ainews-import-result.is-skipped_duplicate {
-  color: var(--color-warning, #fbbf24);
+  color: var(--color-warning, #e5a100);
 }
 .ainews-import-result.is-failed {
-  color: var(--color-danger, #f87171);
+  color: var(--color-danger, #e5534b);
 }
 .ainews-import-result-name {
   flex: 1;

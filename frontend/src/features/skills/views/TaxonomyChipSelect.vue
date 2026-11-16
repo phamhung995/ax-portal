@@ -87,7 +87,7 @@ function toggle(optionId: number) {
 .tcs-chip--category.is-active {
   border-color: var(--ds-color-violet-400, #8b93e8);
   color: var(--ds-color-violet-400, #8b93e8);
-  background: rgb(165 138 239 / .1);
+  background: rgb(94 106 210 / .1);
 }
 .tcs-ph {
   color: var(--ds-color-text-muted);

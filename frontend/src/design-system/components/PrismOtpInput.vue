@@ -154,7 +154,7 @@ watch(
 }
 .p-otp-box:focus {
   border-color: var(--ds-color-accent);
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
 }
 .p-otp-box:disabled {
   opacity: 0.5;

@@ -715,7 +715,7 @@ onMounted(() => {
 .sm-creator:focus-within {
   border-color: var(--ds-color-accent);
   background: var(--ds-input-focus-background);
-  box-shadow: 0 0 0 3px rgb(94 106 210 / .10), 0 0 14px rgb(94 106 210 / .05);
+  box-shadow: 0 0 0 3px rgb(94 106 210 / .10);
 }
 .sm-tag {
   display: inline-flex;
@@ -833,7 +833,7 @@ onMounted(() => {
   display: inline-block;
   font: 12px var(--ds-font-mono);
   color: var(--ds-color-text-muted);
-  background: rgb(9 20 45 / .5);
+  background: rgb(255 255 255 / .5);
   border: 1px solid var(--ds-color-border);
   border-radius: 999px;
   padding: 1px 8px;
@@ -972,7 +972,7 @@ onMounted(() => {
 .map-stage.is-active {
   border-color: var(--ds-color-accent);
   background: rgb(94 106 210 / .1);
-  box-shadow: var(--ds-shadow-glow);
+  box-shadow: var(--ds-shadow-card);
 }
 .map-stage.is-gap {
   border-style: dashed;

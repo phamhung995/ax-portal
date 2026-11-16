@@ -57,7 +57,7 @@ function select(index: number) {
   max-height: 220px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
-  background: var(--ds-color-bg-primary, #12121a);
+  background: var(--ds-color-bg-primary, #14161a);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   /* Ẩn thanh scroll nhưng vẫn scroll được (đồng bộ pattern .ainews-comments) */
   scrollbar-width: none; /* Firefox */

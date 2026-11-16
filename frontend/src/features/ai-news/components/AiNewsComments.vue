@@ -645,7 +645,7 @@ watch(() => props.justSent, () => {
   min-width: 140px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
-  background: rgb(9 20 45 / .98);
+  background: rgb(255 255 255 / .98);
   box-shadow: 0 6px 20px rgb(0 0 0 / .4);
 }
 .ainews-sort-menu button {
@@ -686,7 +686,7 @@ watch(() => props.justSent, () => {
   z-index: 10;
   /* Solid-ish background (no backdrop-filter — blur is GPU-expensive
      and causes scroll jank when the sticky element repaints every frame). */
-  background: rgb(9 20 45 / .98);
+  background: rgb(255 255 255 / .98);
   padding: 10px 12px;
   margin-top: 0;
   margin-bottom: 12px;
@@ -710,7 +710,7 @@ watch(() => props.justSent, () => {
   padding: 10px 14px;
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
-  background: rgb(9 20 45 / .25);
+  background: rgb(255 255 255 / .25);
   color: var(--ds-color-text-muted);
   font-size: 13px;
   cursor: text;
@@ -719,7 +719,7 @@ watch(() => props.justSent, () => {
 }
 .ainews-comment-collapsed:hover {
   border-color: var(--ds-color-border-strong);
-  background: rgb(9 20 45 / .35);
+  background: rgb(255 255 255 / .35);
 }
 .ainews-form-label {
   font-size: 13px;
@@ -787,10 +787,10 @@ watch(() => props.justSent, () => {
   padding: 10px 12px;
   border: 1px solid rgb(154 157 166 / .12);
   border-radius: var(--ds-radius-sm);
-  background: rgb(9 20 45 / .25);
+  background: rgb(255 255 255 / .25);
 }
 .ainews-comment.is-reply {
-  background: rgb(9 20 45 / .15);
+  background: rgb(255 255 255 / .15);
 }
 .ainews-comment-head {
   display: flex;
@@ -890,7 +890,7 @@ watch(() => props.justSent, () => {
 .ainews-comment-content :deep(pre) {
   margin: 4px 0;
   padding: 6px 10px;
-  background: rgb(9 20 45 / .35);
+  background: rgb(255 255 255 / .35);
   border: 1px solid var(--ds-color-border);
   border-radius: var(--ds-radius-sm);
   font-family: var(--ds-font-mono);
