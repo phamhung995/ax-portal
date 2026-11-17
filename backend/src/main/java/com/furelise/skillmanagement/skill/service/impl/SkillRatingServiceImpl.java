@@ -12,6 +12,7 @@ import com.furelise.skillmanagement.user.model.UserSettings;
 import com.furelise.skillmanagement.user.repository.UserRepository;
 import com.furelise.skillmanagement.user.repository.UserSettingsRepository;
 import com.furelise.skillmanagement.common.RateLimiter;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.skill.service.SkillAccessHelper;
 import com.furelise.skillmanagement.skill.service.SkillRatingService;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class SkillRatingServiceImpl implements SkillRatingService {
     private final EventNotificationService eventNotificationService;
     private final SkillAccessHelper skillAccessHelper;
     private final RateLimiter rateLimiter;
+    private final ReputationService reputationService;
 
     @Value("${app.base-url:}")
     private String appBaseUrl;
@@ -89,6 +91,10 @@ public class SkillRatingServiceImpl implements SkillRatingService {
                         .build());
         existing.setRating(BigDecimal.valueOf(rating).setScale(1, RoundingMode.HALF_UP));
         skillRatingRepository.save(existing);
+
+        // Reputation: a new rating moves the skill's cached score.
+        // (Q2: the creator's own rating is stored but excluded from the score.)
+        reputationService.refreshSkill(skillId);
 
         notifyCreator(skill, user, existing.getRating());
         return getRating(skillId);

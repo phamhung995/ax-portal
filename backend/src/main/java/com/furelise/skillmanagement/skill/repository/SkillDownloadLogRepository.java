@@ -19,4 +19,7 @@ public interface SkillDownloadLogRepository extends JpaRepository<SkillDownloadL
 
     /** All download events of a set of skills (grid "Downloads" column). */
     List<SkillDownloadLog> findBySkillIdIn(Collection<Long> skillIds);
+
+    /** Download count of one skill, excluding the creator's own downloads. */
+    long countBySkillIdAndUserIdNot(Long skillId, Long userId);
 }

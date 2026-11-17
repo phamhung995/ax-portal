@@ -29,6 +29,10 @@ public record SkillListItem(
         /** Number of shares awaiting admin approval (only when pendingReason = 'SHARE'). */
         int pendingShareCount,
         boolean isCowork,
-        long downloadCount
+        long downloadCount,
+        /** Cached reputation score (0-100, null = not enough ratings yet). */
+        Double reputationScore,
+        /** NEW | TRUSTED | POPULAR. */
+        String reputationTier
 ) {
 }

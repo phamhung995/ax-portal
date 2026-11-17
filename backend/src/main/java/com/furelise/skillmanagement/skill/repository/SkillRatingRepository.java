@@ -17,6 +17,21 @@ public interface SkillRatingRepository extends JpaRepository<SkillRating, Long> 
     @Query("SELECT AVG(r.rating) FROM SkillRating r WHERE r.skillId = :skillId")
     BigDecimal averageRatingBySkillId(@org.springframework.data.repository.query.Param("skillId") Long skillId);
 
+    /**
+     * Q2 (BA §14, chốt 17/11): self-ratings do NOT count toward the score.
+     * Item average / count excluding the skill creator's own rating.
+     */
+    @Query("SELECT AVG(r.rating) FROM SkillRating r WHERE r.skillId = :skillId AND r.userId <> :userId")
+    BigDecimal averageRatingBySkillIdExcludingUser(
+            @org.springframework.data.repository.query.Param("skillId") Long skillId,
+            @org.springframework.data.repository.query.Param("userId") Long userId);
+
+    long countBySkillIdAndUserIdNot(Long skillId, Long userId);
+
+    /** Global mean rating across all skills — the Bayesian prior mean. */
+    @Query("SELECT AVG(r.rating) FROM SkillRating r")
+    BigDecimal averageRating();
+
     @Query("SELECT COUNT(r) FROM SkillRating r WHERE r.skillId = :skillId")
     long countBySkillId(@org.springframework.data.repository.query.Param("skillId") Long skillId);
 
