@@ -42,6 +42,30 @@ public class SkillRequest {
     @Builder.Default
     private Integer voteCount = 0;
 
+    /**
+     * Fulfillment (GĐ5, BA §8.4 / Q8 chốt 18/11): a request is FULFILLED when
+     * the requester accepts a linked APPROVED skill, or auto-confirmed after
+     * 7 days of silence if the linked skill still meets the bar (APPROVED).
+     * Status: OPEN | PENDING_CONFIRM | FULFILLED.
+     */
+    public static final String FULFILLMENT_OPEN = "OPEN";
+    public static final String FULFILLMENT_PENDING_CONFIRM = "PENDING_CONFIRM";
+    public static final String FULFILLMENT_FULFILLED = "FULFILLED";
+
+    @Column(name = "fulfilled_skill_id")
+    private Long fulfilledSkillId;
+
+    @Column(name = "fulfillment_status", nullable = false)
+    @Builder.Default
+    private String fulfillmentStatus = FULFILLMENT_OPEN;
+
+    /** Requester decision deadline (propose time + 7 days); null unless pending. */
+    @Column(name = "fulfillment_deadline")
+    private Instant fulfillmentDeadline;
+
+    @Column(name = "fulfilled_at")
+    private Instant fulfilledAt;
+
     @Column(name = "comment_count", nullable = false)
     @Builder.Default
     private Integer commentCount = 0;

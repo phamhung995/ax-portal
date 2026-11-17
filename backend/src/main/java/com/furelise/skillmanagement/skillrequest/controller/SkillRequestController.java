@@ -40,6 +40,7 @@ public class SkillRequestController {
     /**
      * Feed of requests ranked by (vote*2 + comment) * time decay.
      * Cursor-based paging: pass nextCursor from the previous page.
+     * sortBy=reputation sorts best-first by cached reputation score.
      */
     @GetMapping("/feed")
     public ResponseEntity<ApiResponse<SkillRequestFeedResult>> feed(
@@ -47,8 +48,10 @@ public class SkillRequestController {
             @RequestParam(value = "cursor", required = false) String cursor,
             @RequestParam(value = "limit", defaultValue = "10") int limit,
             @RequestParam(value = "mine", defaultValue = "false") boolean mine,
-            @RequestParam(value = "title", required = false) String title) {
-        return ResponseEntity.ok(ApiResponse.ok(skillRequestService.feed(cursor, limit, mine, title, user)));
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "sortBy", required = false) String sortBy) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                skillRequestService.feed(cursor, limit, mine, title, sortBy, user)));
     }
 
     /**
@@ -145,6 +148,27 @@ public class SkillRequestController {
             @PathVariable Long id) {
         skillRequestService.unvote(id, user);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Fulfillment (GĐ5, Q8) ──────────────────────────────────────────────
+    /** Proposes an APPROVED skill as the answer; requester has 7 days to decide. */
+    @PostMapping("/{id}/propose-fulfillment")
+    public ResponseEntity<Void> proposeFulfillment(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id,
+            @RequestBody Map<String, Long> body) {
+        skillRequestService.proposeFulfillment(id, body.get("skillId"), user);
+        return ResponseEntity.status(201).build();
+    }
+
+    /** Requester decision on a pending fulfillment: { "accept": true/false }. */
+    @PostMapping("/{id}/fulfillment-decision")
+    public ResponseEntity<Void> fulfillmentDecision(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> body) {
+        skillRequestService.fulfillmentDecision(id, Boolean.TRUE.equals(body.get("accept")), user);
+        return ResponseEntity.ok().build();
     }
 
     /**

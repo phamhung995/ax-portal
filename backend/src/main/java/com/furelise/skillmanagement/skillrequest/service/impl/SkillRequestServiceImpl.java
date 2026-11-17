@@ -5,6 +5,8 @@ import com.furelise.skillmanagement.common.RateLimiter;
 import com.furelise.skillmanagement.exception.BusinessErrorCode;
 import com.furelise.skillmanagement.exception.BusinessException;
 import com.furelise.skillmanagement.notification.service.EventNotificationService;
+import com.furelise.skillmanagement.reputation.model.ReputationScore;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.skill.model.Skill;
 import com.furelise.skillmanagement.skill.repository.SkillRepository;
 import com.furelise.skillmanagement.skillrequest.dto.MentionUserItem;
@@ -133,6 +135,7 @@ public class SkillRequestServiceImpl implements SkillRequestService {
     private final EventNotificationService eventNotificationService;
     private final RateLimiter rateLimiter;
     private final CommentHtmlSanitizer commentHtmlSanitizer;
+    private final ReputationService reputationService;
 
     /**
      * Runs the post-commit @mention notification work in its OWN transaction.
@@ -157,6 +160,7 @@ public class SkillRequestServiceImpl implements SkillRequestService {
                                    EventNotificationService eventNotificationService,
                                    RateLimiter rateLimiter,
                                    CommentHtmlSanitizer commentHtmlSanitizer,
+                                   ReputationService reputationService,
                                    PlatformTransactionManager transactionManager) {
         this.skillRequestRepository = skillRequestRepository;
         this.voteRepository = voteRepository;
@@ -170,6 +174,7 @@ public class SkillRequestServiceImpl implements SkillRequestService {
         this.eventNotificationService = eventNotificationService;
         this.rateLimiter = rateLimiter;
         this.commentHtmlSanitizer = commentHtmlSanitizer;
+        this.reputationService = reputationService;
         this.notificationTransaction = new TransactionTemplate(transactionManager);
         this.notificationTransaction.setPropagationBehavior(
                 org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -188,7 +193,8 @@ public class SkillRequestServiceImpl implements SkillRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public SkillRequestFeedResult feed(String cursor, int limit, boolean mine, String title, User viewer) {
+    public SkillRequestFeedResult feed(String cursor, int limit, boolean mine, String title,
+                                      String sortBy, User viewer) {
         int size = limit < 1 ? FEED_DEFAULT_LIMIT : Math.min(limit, FEED_MAX_LIMIT);
 
         // Fetch all matching requests, rank in Java, then apply the cursor.
@@ -215,11 +221,31 @@ public class SkillRequestServiceImpl implements SkillRequestService {
         final Instant cursorTs = cursorCreatedAt;
         final Long cursorIdFinal = cursorId;
 
-        List<SkillRequest> ranked = candidates.stream()
-                .sorted(Comparator
-                        .comparing(SkillRequest::getCreatedAt, Comparator.reverseOrder())
-                        .thenComparing(SkillRequest::getId, Comparator.reverseOrder()))
-                .toList();
+        // Default order: newest first. sortBy=reputation: cached reputation
+        // score DESC (null = not enough verified votes yet, sorts last),
+        // tie-break createdAt DESC, id DESC (same pattern as Skill/MCP).
+        // The cursor still resumes by (createdAt, id) of the last item, so
+        // it works for either order.
+        List<SkillRequest> ranked;
+        if ("reputation".equalsIgnoreCase(sortBy)) {
+            Map<Long, ReputationScore> scores = reputationService.getReputations(
+                    "SKILL_REQUEST", candidates.stream().map(SkillRequest::getId).toList());
+            ranked = candidates.stream()
+                    .sorted(Comparator.comparingDouble(
+                                    (SkillRequest r) -> scores.get(r.getId()) != null
+                                            && scores.get(r.getId()).getScore() != null
+                                            ? scores.get(r.getId()).getScore().doubleValue() : -1.0)
+                            .reversed()
+                            .thenComparing(SkillRequest::getCreatedAt, Comparator.reverseOrder())
+                            .thenComparing(SkillRequest::getId, Comparator.reverseOrder()))
+                    .toList();
+        } else {
+            ranked = candidates.stream()
+                    .sorted(Comparator
+                            .comparing(SkillRequest::getCreatedAt, Comparator.reverseOrder())
+                            .thenComparing(SkillRequest::getId, Comparator.reverseOrder()))
+                    .toList();
+        }
 
         // Cursor = (createdAt, id) of the last item of the previous page:
         // resume right after that item in the ranked order.
@@ -267,10 +293,19 @@ public class SkillRequestServiceImpl implements SkillRequestService {
     // ------------------------------------------------------------------
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public SkillRequestFeedItem detail(Long requestId, User viewer) {
+        // NOT read-only: a PENDING_CONFIRM request whose 7-day window has
+        // passed is auto-confirmed (or reverted) on read — the lazy
+        // auto-confirm (GĐ5, Q8). refreshSkillRequest evaluates the deadline
+        // and recomputes the score in the same transaction.
         SkillRequest request = getExisting(requestId);
-        return buildFeedItems(List.of(request), viewer).get(0);
+        if (SkillRequest.FULFILLMENT_PENDING_CONFIRM.equals(request.getFulfillmentStatus())
+                && request.getFulfillmentDeadline() != null
+                && Instant.now().isAfter(request.getFulfillmentDeadline())) {
+            reputationService.refreshSkillRequest(requestId);
+        }
+        return buildFeedItems(List.of(getExisting(requestId)), viewer).get(0);
     }
 
     /**
@@ -285,6 +320,14 @@ public class SkillRequestServiceImpl implements SkillRequestService {
         Map<Long, User> creators = loadUsersByIds(requests.stream()
                 .map(SkillRequest::getCreatedBy).collect(Collectors.toSet()));
         Set<Long> votedIds = loadVotedIds(requests, viewer.getId());
+
+        // Cached reputation scores (one query for the whole page, no N+1) +
+        // fulfilling-skill names for the fulfillment state (GĐ5).
+        Map<Long, ReputationScore> reputations = reputationService.getReputations(
+                "SKILL_REQUEST", requests.stream().map(SkillRequest::getId).toList());
+        Map<Long, Skill> fulfilledSkills = loadSkills(requests.stream()
+                .map(SkillRequest::getFulfilledSkillId)
+                .filter(java.util.Objects::nonNull).distinct().collect(Collectors.toSet()));
 
         // Comments of the whole page in one query (no N+1).
         List<Long> requestIds = requests.stream().map(SkillRequest::getId).toList();
@@ -375,7 +418,15 @@ public class SkillRequestServiceImpl implements SkillRequestService {
                     resolvedSkills,
                     resolvedSkillCount,
                     topComments,
-                    fileItems);
+                    fileItems,
+                    reputations.get(r.getId()) != null && reputations.get(r.getId()).getScore() != null
+                            ? reputations.get(r.getId()).getScore().doubleValue() : null,
+                    reputations.get(r.getId()) != null ? reputations.get(r.getId()).getTier() : "NEW",
+                    r.getFulfillmentStatus(),
+                    r.getFulfilledSkillId(),
+                    r.getFulfilledSkillId() != null && fulfilledSkills.get(r.getFulfilledSkillId()) != null
+                            ? fulfilledSkills.get(r.getFulfilledSkillId()).getName() : null,
+                    r.getFulfillmentDeadline());
         }).toList();
     }
 
@@ -543,6 +594,9 @@ public class SkillRequestServiceImpl implements SkillRequestService {
                 .build());
         request.setVoteCount(request.getVoteCount() + 1);
         skillRequestRepository.save(request);
+        // A vote changes the verified-vote count (and evaluates a pending
+        // auto-confirm) — recompute the cached request score (GĐ5).
+        reputationService.refreshSkillRequest(requestId);
         notifyForumEvent(request, user,
                 "voted for your request \"" + request.getTitle() + "\".",
                 "voted for your skill request \"" + request.getTitle() + "\".");
@@ -564,6 +618,73 @@ public class SkillRequestServiceImpl implements SkillRequestService {
         voteRepository.deleteByRequestIdAndUserId(requestId, user.getId());
         request.setVoteCount(Math.max(0, request.getVoteCount() - 1));
         skillRequestRepository.save(request);
+        reputationService.refreshSkillRequest(requestId);
+    }
+
+    // ------------------------------------------------------------------
+    // Fulfillment (GĐ5, Q8 chốt 18/11)
+    // ------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void proposeFulfillment(Long requestId, Long skillId, User user) {
+        SkillRequest request = getExisting(requestId);
+        // The only ban carried over from the bounty design: the requester
+        // cannot fulfil their own request. Proposing your own skill for
+        // someone else's request is legitimate (and earns the credit).
+        if (request.getCreatedBy().equals(user.getId())) {
+            throw new BusinessException(BusinessErrorCode.SKILL_REQUEST_NOT_EDITABLE,
+                    "You cannot propose a skill for your own request.");
+        }
+        if (!SkillRequest.FULFILLMENT_OPEN.equals(request.getFulfillmentStatus())) {
+            throw new BusinessException(BusinessErrorCode.SKILL_REQUEST_NOT_EDITABLE,
+                    "This request already has a pending or accepted fulfillment.");
+        }
+        Skill skill = skillRepository.findById(skillId).orElse(null);
+        if (skill == null || "Y".equals(skill.getDeletedYn())) {
+            throw new BusinessException(BusinessErrorCode.SKILL_REQUEST_LINK_INVALID,
+                    "Linked skill not found.");
+        }
+        if (!Skill.STATUS_APPROVED.equals(skill.getApprovalStatus())) {
+            throw new BusinessException(BusinessErrorCode.SKILL_REQUEST_LINK_INVALID,
+                    "Only an APPROVED skill can fulfil a request.");
+        }
+        request.setFulfilledSkillId(skillId);
+        request.setFulfillmentStatus(SkillRequest.FULFILLMENT_PENDING_CONFIRM);
+        request.setFulfillmentDeadline(Instant.now().plus(Duration.ofDays(
+                com.furelise.skillmanagement.reputation.service.ReputationService.FULFILLMENT_DECISION_DAYS)));
+        skillRequestRepository.save(request);
+        reputationService.refreshSkillRequest(requestId);
+    }
+
+    @Override
+    @Transactional
+    public void fulfillmentDecision(Long requestId, boolean accept, User user) {
+        SkillRequest request = getExisting(requestId);
+        if (!SkillRequest.FULFILLMENT_PENDING_CONFIRM.equals(request.getFulfillmentStatus())) {
+            throw new BusinessException(BusinessErrorCode.SKILL_REQUEST_NOT_EDITABLE,
+                    "This request has no pending fulfillment to decide on.");
+        }
+        // Requester only — the fulfilment is theirs to accept or reject.
+        if (!request.getCreatedBy().equals(user.getId())) {
+            throw new BusinessException(BusinessErrorCode.SKILL_REQUEST_NOT_EDITABLE,
+                    "Only the request creator can decide on a fulfillment.");
+        }
+        if (accept) {
+            request.setFulfillmentStatus(SkillRequest.FULFILLMENT_FULFILLED);
+            request.setFulfilledAt(Instant.now());
+        } else {
+            // Back to OPEN: link + deadline cleared, the request can be
+            // proposed again (by anyone except the requester).
+            request.setFulfillmentStatus(SkillRequest.FULFILLMENT_OPEN);
+            request.setFulfilledSkillId(null);
+            request.setFulfillmentDeadline(null);
+            request.setFulfilledAt(null);
+        }
+        skillRequestRepository.save(request);
+        // Recompute the request score (+15 boost when fulfilled) and the
+        // fulfilling author's contributor tier (fulfilled count, BA §9.3).
+        reputationService.refreshSkillRequest(requestId);
     }
 
     // ------------------------------------------------------------------

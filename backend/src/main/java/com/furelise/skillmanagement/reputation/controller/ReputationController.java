@@ -1,6 +1,7 @@
 package com.furelise.skillmanagement.reputation.controller;
 
 import com.furelise.skillmanagement.common.dto.ApiResponse;
+import com.furelise.skillmanagement.reputation.dto.ContributorResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationExplainResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationResponse;
 import com.furelise.skillmanagement.reputation.service.ReputationService;
@@ -39,6 +40,18 @@ public class ReputationController {
             @PathVariable String targetType, @PathVariable Long targetId) {
         return ResponseEntity.ok(ApiResponse.ok(
                 reputationService.explain(validated(targetType), targetId)));
+    }
+
+    /**
+     * Contributor (author) reputation (GĐ5, BA §8.5). Dedicated endpoint
+     * because contributors live in contributor_reputation, not in the
+     * (target_type, target_id) score cache — the generic handler cannot
+     * serve them.
+     */
+    @GetMapping("/CONTRIBUTOR/{userId}")
+    public ResponseEntity<ApiResponse<ContributorResponse>> contributor(
+            @PathVariable Long userId) {
+        return ResponseEntity.ok(ApiResponse.ok(reputationService.getContributor(userId)));
     }
 
     private String validated(String targetType) {

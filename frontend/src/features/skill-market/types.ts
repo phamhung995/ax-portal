@@ -52,6 +52,31 @@ export interface SkillRequestFeedItem {
   resolvedSkillCount: number
   topComments: TopCommentItem[]
   files: SkillRequestFileItem[]
+  /** Cached reputation score (null = not enough verified votes yet, NEW). */
+  reputationScore: number | null
+  /** NEW | TRUSTED | POPULAR. */
+  reputationTier: string
+  /** Fulfillment (GĐ5, Q8): OPEN | PENDING_CONFIRM | FULFILLED. */
+  fulfillmentStatus: string
+  /** Skill proposed/accepted as the answer (null unless pending/fulfilled). */
+  fulfilledSkillId: number | null
+  /** Name of the fulfilling skill (null unless pending/fulfilled). */
+  fulfilledSkillName: string | null
+  /** Requester decision deadline, ISO string (null unless PENDING_CONFIRM). */
+  fulfillmentDeadline: string | null
+}
+
+/** Contributor (author) reputation (GĐ5, BA §8.5). */
+export interface ContributorReputation {
+  userId: number
+  userName: string | null
+  avatarUrl: string | null
+  /** NEW_MEMBER | VERIFIED | TRUSTED_AUTHOR | EXPERT. */
+  tier: string
+  itemCount: number
+  avgScore: number | null
+  fulfilledRequests: number
+  reportCount: number
 }
 
 export interface SkillRequestFeedResult {

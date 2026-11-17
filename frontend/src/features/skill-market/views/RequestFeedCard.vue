@@ -4,6 +4,7 @@ import { ThumbsUp, MessageSquare, Check, MoreVertical, Pencil, Trash2, Link2 } f
 import { useRouter } from 'vue-router'
 import PrismAvatar from '@/design-system/components/PrismAvatar.vue'
 import PrismBadge from '@/design-system/components/PrismBadge.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
 import SkillDetailPopup from '@/features/skills/views/SkillDetailPopup.vue'
 import { skillRequestApi } from '@/features/skill-market/api'
 import { toUserError } from '@/lib/api'
@@ -126,6 +127,10 @@ async function onVote() {
 }
 
 // ── Navigate to the detail screen (full comments live there) ───────────────
+function openContributor(userId: number) {
+  void router.push({ name: 'contributor-profile', params: { userId } })
+}
+
 function openDetail() {
   void router.push({ name: 'skill-market-detail', params: { id: props.item.id } })
 }
@@ -151,12 +156,22 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
     <header class="card-head">
       <PrismAvatar :name="item.creatorName ?? ''" :src="item.creatorAvatarUrl ?? undefined" :size="40" />
       <div class="card-who">
-        <span class="card-name">{{ item.creatorName ?? t('app.common.unknown') }}</span>
+        <button type="button" class="card-name card-name--link" @click.stop="openContributor(item.creatorId)">
+          {{ item.creatorName ?? t('app.common.unknown') }}
+        </button>
         <span class="card-time-row">
           <span class="card-time">{{ timeAgo(item.createdAt) }}</span>
           <PrismBadge v-if="item.hasResolvedComment" tone="success" class="card-resolved">
             <Check :size="12" aria-hidden="true" /> {{ t('app.skillMarket.resolved') }}
           </PrismBadge>
+          <PrismBadge v-if="item.fulfillmentStatus === 'FULFILLED'" tone="success" class="card-resolved">
+            <Check :size="12" aria-hidden="true" /> Đã đáp ứng
+          </PrismBadge>
+          <ReputationBadge
+            :tier="item.reputationTier"
+            :score="item.reputationScore"
+            new-hint="Mới: chưa đủ lượt bình chọn để xếp hạng (cần 5)"
+          />
         </span>
       </div>
       <!-- Kebab menu (creator only) -->
@@ -380,6 +395,20 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
 .card-name {
   font-weight: 600;
   font-size: 15px;
+}
+.card-name--link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .card-name--link:hover {
+    color: var(--ds-color-accent);
+  }
 }
 .card-time-row {
   display: inline-flex;

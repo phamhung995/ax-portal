@@ -1,5 +1,6 @@
 package com.furelise.skillmanagement.reputation.service;
 
+import com.furelise.skillmanagement.reputation.dto.ContributorResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationExplainResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationResponse;
 import com.furelise.skillmanagement.reputation.model.ReputationScore;
@@ -29,6 +30,18 @@ public interface ReputationService {
     /** Bayesian prior weight (a "virtual" 10 ratings at the global mean). */
     int BAYESIAN_PRIOR = 10;
 
+    /** Minimum number of verified votes before a request score is shown. */
+    int MIN_VERIFIED_VOTES = 5;
+
+    /** Half-life (days) of the Skill Request time decay (GĐ5). */
+    int REQUEST_HALF_LIFE_DAYS = 30;
+
+    /** Display boost for a FULFILLED request, capped at 100 (GĐ5). */
+    int FULFILLED_BOOST = 15;
+
+    /** Requester decision window for a proposed fulfillment (GĐ5, Q8). */
+    int FULFILLMENT_DECISION_DAYS = 7;
+
     /** Recompute and persist the score of one skill. */
     ReputationScore refreshSkill(Long skillId);
 
@@ -47,8 +60,20 @@ public interface ReputationService {
      */
     ReputationScore refreshAiNews(Long newsId);
 
+    /**
+     * Recompute and persist the score of one skill request (GĐ5): verified
+     * votes only (Q6), 30-day half-life decay, +15 display boost when
+     * FULFILLED (capped at 100). Also evaluates the lazy auto-confirm
+     * (PENDING_CONFIRM past its deadline with the linked skill still
+     * APPROVED → FULFILLED) before computing.
+     */
+    ReputationScore refreshSkillRequest(Long requestId);
+
     /** Recompute and persist the contributor tier of one user. */
     void refreshContributor(Long userId);
+
+    /** Cached contributor row (NEW_MEMBER / empty row when never computed). */
+    ContributorResponse getContributor(Long userId);
 
     /** Cached row for one target (NEW / empty row when never computed). */
     ReputationResponse getReputation(String targetType, Long targetId);

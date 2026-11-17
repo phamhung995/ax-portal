@@ -18,6 +18,8 @@ export const useSkillRequestFeedStore = defineStore('skillRequestFeed', () => {
     error: '',
     mine: false,
     title: '',
+    /** '' = newest first (default), 'reputation' = best-first (GĐ5). */
+    sortBy: '',
     /** userId of the viewer whose feed is currently cached (null = never loaded). */
     loadedBy: null as number | null,
   })
@@ -45,6 +47,7 @@ export const useSkillRequestFeedStore = defineStore('skillRequestFeed', () => {
         reset()
         state.mine = false
         state.title = ''
+        state.sortBy = ''
       }
     }
   )

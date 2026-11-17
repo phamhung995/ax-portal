@@ -8,8 +8,8 @@ import type {
 } from './types'
 
 export const skillRequestApi = {
-  /** Feed page ranked by (vote*2 + comment) * time decay. */
-  feed: (cursor: string | null, limit = 10, mine = false, title?: string) =>
+  /** Feed page ranked by (vote*2 + comment) * time decay, or sortBy=reputation for best-first. */
+  feed: (cursor: string | null, limit = 10, mine = false, title?: string, sortBy?: string) =>
     request<SkillRequestFeedResult>(
       api.get('/skill-requests/feed', {
         params: {
@@ -17,6 +17,7 @@ export const skillRequestApi = {
           limit,
           mine: mine || undefined,
           title: title || undefined,
+          sortBy: sortBy || undefined,
         },
       })
     ),
@@ -50,6 +51,13 @@ export const skillRequestApi = {
   },
   vote: (id: number) => request<void>(api.post(`/skill-requests/${id}/vote`)),
   unvote: (id: number) => request<void>(api.delete(`/skill-requests/${id}/vote`)),
+  // ── Fulfillment (GĐ5, Q8) ──────────────────────────────────────────────
+  /** Proposes an APPROVED skill as the answer; requester has 7 days to decide. */
+  proposeFulfillment: (id: number, skillId: number) =>
+    request<void>(api.post(`/skill-requests/${id}/propose-fulfillment`, { skillId })),
+  /** Requester decision on a pending fulfillment. */
+  fulfillmentDecision: (id: number, accept: boolean) =>
+    request<void>(api.post(`/skill-requests/${id}/fulfillment-decision`, { accept })),
   update: (id: number, payload: { title: string; description?: string; hashtags: string[]; files?: File[]; removeFileIds?: number[] }) => {
     const form = new FormData()
     form.append('title', payload.title)

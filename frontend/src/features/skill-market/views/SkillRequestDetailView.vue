@@ -4,6 +4,7 @@ import { ArrowLeft, ThumbsUp, MessageSquare, Link2, Check, X, MoreVertical, Penc
 import { useRoute, useRouter } from 'vue-router'
 import PrismAvatar from '@/design-system/components/PrismAvatar.vue'
 import PrismBadge from '@/design-system/components/PrismBadge.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismDialog from '@/design-system/components/PrismDialog.vue'
 import PrismEmptyState from '@/design-system/components/PrismEmptyState.vue'
@@ -55,6 +56,18 @@ const pendingSkill = ref<SkillListItem | null>(null)
 const linkPopupOpen = ref(false)
 const detailSkillId = ref<number | null>(null)
 
+// ── Fulfillment (GĐ5, Q8) ────────────────────────────────────────────────
+// LinkSkillPopup is shared with the comment linker: proposeMode tells
+// onSkillSelected to propose the picked skill as the answer instead of
+// attaching it to a comment draft.
+const proposeMode = ref(false)
+const fulfillmentBusy = ref(false)
+
+function formatDeadline(iso: string | null): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 // ── Reply state (one open reply form at a time) ───────────────────────────
 const replyParentId = ref<number | null>(null)
 const replyDraft = ref('')
@@ -78,6 +91,10 @@ async function loadStats() {
 
 function openRequestDetail(id: number) {
   void router.push({ name: 'skill-market-detail', params: { id } })
+}
+
+function openContributor(userId: number) {
+  void router.push({ name: 'contributor-profile', params: { userId } })
 }
 
 // ── Kebab menu on the post (creator only: Edit / Delete) ──────────────────
@@ -246,7 +263,48 @@ function onResolvedSkillClick(s: { skillId: number; skillStatus: string | null }
 }
 
 function onSkillSelected(skill: SkillListItem) {
+  if (proposeMode.value) {
+    proposeMode.value = false
+    void onProposeFulfillment(skill)
+    return
+  }
   pendingSkill.value = skill
+}
+
+// ── Fulfillment (GĐ5, Q8): propose / accept / reject ──────────────────────
+function openProposePopup() {
+  proposeMode.value = true
+  linkPopupOpen.value = true
+}
+
+async function onProposeFulfillment(skill: SkillListItem) {
+  const it = item.value
+  if (!it || fulfillmentBusy.value) return
+  fulfillmentBusy.value = true
+  try {
+    await skillRequestApi.proposeFulfillment(it.id, skill.id)
+    toastSuccess('Đã đề xuất skill đáp ứng — người đăng có 7 ngày để xác nhận.')
+    await loadDetail()
+  } catch (err) {
+    toastError(toUserError(err).message)
+  } finally {
+    fulfillmentBusy.value = false
+  }
+}
+
+async function onFulfillmentDecision(accept: boolean) {
+  const it = item.value
+  if (!it || fulfillmentBusy.value) return
+  fulfillmentBusy.value = true
+  try {
+    await skillRequestApi.fulfillmentDecision(it.id, accept)
+    toastSuccess(accept ? 'Đã xác nhận request được đáp ứng.' : 'Đã từ chối — request mở lại để nhận đề xuất khác.')
+    await loadDetail()
+  } catch (err) {
+    toastError(toUserError(err).message)
+  } finally {
+    fulfillmentBusy.value = false
+  }
 }
 
 // ── Vote (toggle) ─────────────────────────────────────────────────────────
@@ -487,12 +545,22 @@ onBeforeUnmount(() => {
               <header class="srd-head">
                 <PrismAvatar :name="item.creatorName ?? ''" :src="item.creatorAvatarUrl ?? undefined" :size="40" />
                 <div class="srd-who">
-                  <span class="srd-name">{{ item.creatorName ?? t('app.common.unknown') }}</span>
+                  <button type="button" class="srd-name srd-name--link" @click="openContributor(item.creatorId)">
+                    {{ item.creatorName ?? t('app.common.unknown') }}
+                  </button>
                   <span class="srd-time">{{ timeAgo(item.createdAt) }}</span>
                 </div>
                 <PrismBadge v-if="item.hasResolvedComment" tone="success" class="srd-resolved">
                   <Check :size="12" aria-hidden="true" /> {{ t('app.skillMarket.resolved') }}
                 </PrismBadge>
+                <PrismBadge v-if="item.fulfillmentStatus === 'FULFILLED'" tone="success" class="srd-resolved">
+                  <Check :size="12" aria-hidden="true" /> Đã đáp ứng
+                </PrismBadge>
+                <ReputationBadge
+                  :tier="item.reputationTier"
+                  :score="item.reputationScore"
+                  new-hint="Mới: chưa đủ lượt bình chọn để xếp hạng (cần 5)"
+                />
                 <!-- Kebab menu (creator only) -->
                 <div v-if="item.isRequestCreator" class="srd-kebab">
                   <button
@@ -573,6 +641,43 @@ onBeforeUnmount(() => {
                 <span v-if="item.resolvedSkillCount > item.resolvedSkills.length" class="resolved-more">
                   {{ t('app.skillMarket.more', { n: item.resolvedSkillCount - item.resolvedSkills.length }) }}
                 </span>
+              </div>
+
+              <!-- Fulfillment (GĐ5, Q8): propose / pending decision / fulfilled -->
+              <div v-if="item.fulfillmentStatus === 'FULFILLED'" class="fulfill-box fulfill-box--done">
+                <Check :size="14" aria-hidden="true" />
+                <span>
+                  Đã đáp ứng bởi
+                  <button
+                    v-if="item.fulfilledSkillId"
+                    type="button"
+                    class="fulfill-skill"
+                    @click="detailSkillId = item.fulfilledSkillId"
+                  >
+                    {{ item.fulfilledSkillName ?? 'skill' }}
+                  </button>
+                  <span v-else>{{ item.fulfilledSkillName ?? 'skill' }}</span>
+                </span>
+              </div>
+              <div v-else-if="item.fulfillmentStatus === 'PENDING_CONFIRM'" class="fulfill-box">
+                <Link2 :size="14" aria-hidden="true" />
+                <span class="fulfill-text">
+                  Đang chờ xác nhận: <strong>{{ item.fulfilledSkillName ?? 'skill' }}</strong>
+                  <span v-if="item.fulfillmentDeadline"> — hạn xác nhận {{ formatDeadline(item.fulfillmentDeadline) }} (quá hạn sẽ tự xác nhận nếu skill vẫn đạt chuẩn)</span>
+                </span>
+                <span v-if="item.isRequestCreator" class="fulfill-actions">
+                  <PrismButton variant="secondary" :loading="fulfillmentBusy" @click="onFulfillmentDecision(true)">
+                    Xác nhận đã đáp ứng
+                  </PrismButton>
+                  <PrismButton variant="ghost" :loading="fulfillmentBusy" @click="onFulfillmentDecision(false)">
+                    Từ chối
+                  </PrismButton>
+                </span>
+              </div>
+              <div v-else-if="!item.isRequestCreator" class="fulfill-box fulfill-box--propose">
+                <PrismButton variant="ghost" :loading="fulfillmentBusy" @click="openProposePopup">
+                  <Link2 :size="14" aria-hidden="true" /> Đề xuất skill đáp ứng
+                </PrismButton>
               </div>
 
               <!-- Action bar: flat icon buttons -->
@@ -701,7 +806,9 @@ onBeforeUnmount(() => {
                   <span class="member-rank">{{ i === 0 ? '🏆' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1 }}</span>
                   <PrismAvatar :name="m.userName ?? ''" :src="m.userAvatarUrl ?? undefined" :size="32" />
                   <div class="member-info">
-                    <div class="member-name">{{ m.userName ?? t('app.common.unknown') }}</div>
+                    <button type="button" class="member-name member-name--link" @click="openContributor(m.userId)">
+                      {{ m.userName ?? t('app.common.unknown') }}
+                    </button>
                     <div class="member-role">{{ t('app.skillMarket.skillsLinked', { n: m.skillLinkCount }) }}</div>
                   </div>
                 </div>
@@ -879,6 +986,20 @@ onBeforeUnmount(() => {
 .srd-name {
   font-weight: 600;
   font-size: 15px;
+}
+.srd-name--link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .srd-name--link:hover {
+    color: var(--ds-color-accent);
+  }
 }
 .srd-time {
   font-size: 12px;
@@ -1065,6 +1186,50 @@ onBeforeUnmount(() => {
 .resolved-more {
   font: 12px var(--ds-font-mono);
   color: var(--ds-color-text-muted);
+}
+
+/* Fulfillment (GĐ5, Q8) */
+.fulfill-box {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  margin-top: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border: 1px solid var(--ds-color-border);
+  border-radius: 8px;
+  background: rgb(103 232 249 / .05);
+  font-size: 13.5px;
+  color: var(--ds-color-text-secondary);
+}
+.fulfill-box--done {
+  border-color: rgb(156 232 208 / .30);
+  background: rgb(156 232 208 / .07);
+  color: var(--ds-color-success);
+}
+.fulfill-box--propose {
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: transparent;
+}
+.fulfill-text {
+  flex: 1;
+  min-width: 200px;
+}
+.fulfill-actions {
+  display: inline-flex;
+  gap: var(--ds-space-2);
+  margin-left: auto;
+}
+.fulfill-skill {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ds-color-success);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .resolved-by {
   font: 11px var(--ds-font-sans);
@@ -1440,6 +1605,21 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.member-name--link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+}
+@media (hover: hover) {
+  .member-name--link:hover {
+    color: var(--ds-color-accent);
+  }
 }
 .member-role {
   font: 11px var(--ds-font-mono);

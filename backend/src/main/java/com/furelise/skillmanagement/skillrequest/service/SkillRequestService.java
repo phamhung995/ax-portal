@@ -22,14 +22,18 @@ public interface SkillRequestService {
 
     /**
      * One feed page of requests ranked by
-     * {@code (voteCount*2 + commentCount) * timeDecay}, then createdAt DESC.
+     * {@code (voteCount*2 + commentCount) * timeDecay}, then createdAt DESC —
+     * or, when sortBy is "reputation", by cached reputation score DESC
+     * (nulls last, tie-break createdAt DESC, id DESC).
      *
      * @param cursor opaque cursor from the previous page (null = first page)
      * @param limit  page size
      * @param mine   only requests created by the viewer
      * @param title  optional title filter (case-insensitive contains)
+     * @param sortBy "reputation" for best-first, anything else = default order
      */
-    SkillRequestFeedResult feed(String cursor, int limit, boolean mine, String title, User viewer);
+    SkillRequestFeedResult feed(String cursor, int limit, boolean mine, String title,
+                               String sortBy, User viewer);
 
     /**
      * The {@code limit} most recently created requests (createdAt DESC, id DESC),
@@ -51,6 +55,23 @@ public interface SkillRequestService {
 
     /** Removes the viewer's vote (404 when not voted). */
     void unvote(Long requestId, User user);
+
+    /**
+     * Proposes an APPROVED skill as the answer to a request (GĐ5, Q8).
+     * Sets PENDING_CONFIRM with a 7-day decision deadline for the requester.
+     * Rejects: skill not APPROVED, request already PENDING_CONFIRM/FULFILLED,
+     * or the proposer IS the requester (the only ban carried over from the
+     * bounty design — proposing your own skill for someone else's request
+     * is legitimate).
+     */
+    void proposeFulfillment(Long requestId, Long skillId, User user);
+
+    /**
+     * Requester decision on a pending fulfillment (GĐ5, Q8). accept=true →
+     * FULFILLED; accept=false → back to OPEN (link + deadline cleared, the
+     * request can be proposed again). Requester only.
+     */
+    void fulfillmentDecision(Long requestId, boolean accept, User user);
 
     /**
      * Paged top-level comments (newest first, non-deleted), each with its

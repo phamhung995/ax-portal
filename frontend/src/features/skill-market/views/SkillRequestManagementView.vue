@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismDialog from '@/design-system/components/PrismDialog.vue'
@@ -21,6 +21,7 @@ const feed = useSkillRequestFeedStore()
 const s = feed.state
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18nStore()
 
 const addOpen = ref(false)
@@ -53,7 +54,8 @@ async function loadPage(cursor: string | null) {
   s.loading = true
   s.error = ''
   try {
-    const result = await skillRequestApi.feed(cursor, 10, s.mine, s.title || undefined)
+    const result = await skillRequestApi.feed(cursor, 10, s.mine, s.title || undefined,
+      s.sortBy || undefined)
     feed.appendResult(result, viewerId())
     // Refresh sidebar stats: votes/comments changed.
     void loadStats()
@@ -110,9 +112,22 @@ function onChip(mine: boolean) {
   loadFirst()
 }
 
+// ── Sort: newest (default) / reputation best-first (GĐ5) ───────────────────
+function onSortReputation() {
+  s.sortBy = s.sortBy === 'reputation' ? '' : 'reputation'
+  // Keep the choice in the URL so it survives reload / sharing (?sortBy=reputation).
+  void router.replace({ query: { ...route.query, sortBy: s.sortBy || undefined } })
+  loadFirst()
+}
+
 // Top Voted: open the request detail screen
 function openRequestDetail(id: number) {
   void router.push({ name: 'skill-market-detail', params: { id } })
+}
+
+// Top Contributors: open the contributor profile screen
+function openContributor(userId: number) {
+  void router.push({ name: 'contributor-profile', params: { userId } })
 }
 
 // ── Infinite scroll ─────────────────────────────────────────────────────────
@@ -177,6 +192,10 @@ onMounted(() => {
     s.title = ''
     searchInput.value = ''
   }
+  // Deep-link: ?sortBy=reputation sorts best-first (same as Skill/MCP).
+  if (route.query.sortBy === 'reputation') {
+    s.sortBy = 'reputation'
+  }
   loadFirst()
   document.addEventListener('keydown', onKeydown)
 })
@@ -213,6 +232,9 @@ onBeforeUnmount(() => {
             </button>
             <button type="button" class="chip" :class="{ 'is-active': s.mine }" @click="onChip(true)">
               {{ t('app.skillMarket.myRequests') }}
+            </button>
+            <button type="button" class="chip" :class="{ 'is-active': s.sortBy === 'reputation' }" @click="onSortReputation()">
+              Uy tín nhất
             </button>
           </div>
           <div class="search-wrap">
@@ -302,7 +324,9 @@ onBeforeUnmount(() => {
               <span class="member-rank">{{ i === 0 ? '🏆' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1 }}</span>
               <PrismAvatar :name="m.userName ?? ''" :src="m.userAvatarUrl ?? undefined" :size="32" />
               <div class="member-info">
-                <div class="member-name">{{ m.userName ?? t('app.common.unknown') }}</div>
+                <button type="button" class="member-name member-name--link" @click="openContributor(m.userId)">
+                  {{ m.userName ?? t('app.common.unknown') }}
+                </button>
                 <div class="member-role">{{ t('app.skillMarket.skillsLinked', { n: m.skillLinkCount }) }}</div>
               </div>
             </div>
@@ -701,6 +725,21 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.member-name--link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+}
+@media (hover: hover) {
+  .member-name--link:hover {
+    color: var(--ds-color-accent);
+  }
 }
 .member-role {
   font: 11px var(--ds-font-mono);

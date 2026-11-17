@@ -189,7 +189,17 @@ class SkillCoworkIntegrationTest {
             }
 
             @Override
+            public com.furelise.skillmanagement.reputation.model.ReputationScore refreshSkillRequest(Long requestId) {
+                return null;
+            }
+
+            @Override
             public void refreshContributor(Long userId) {
+            }
+
+            @Override
+            public com.furelise.skillmanagement.reputation.dto.ContributorResponse getContributor(Long userId) {
+                return null;
             }
 
             @Override

@@ -12,6 +12,7 @@ import com.furelise.skillmanagement.mcp.model.McpMaster;
 import com.furelise.skillmanagement.mcp.repository.McpDownloadLogRepository;
 import com.furelise.skillmanagement.mcp.repository.McpMasterRepository;
 import com.furelise.skillmanagement.mcp.repository.McpRatingRepository;
+import com.furelise.skillmanagement.reputation.dto.ContributorResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationExplainResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationResponse;
 import com.furelise.skillmanagement.reputation.model.ContributorReputation;
@@ -24,6 +25,11 @@ import com.furelise.skillmanagement.skill.model.Skill;
 import com.furelise.skillmanagement.skill.repository.SkillDownloadLogRepository;
 import com.furelise.skillmanagement.skill.repository.SkillRatingRepository;
 import com.furelise.skillmanagement.skill.repository.SkillRepository;
+import com.furelise.skillmanagement.skillrequest.model.SkillRequest;
+import com.furelise.skillmanagement.skillrequest.repository.SkillRequestRepository;
+import com.furelise.skillmanagement.skillrequest.repository.SkillRequestVoteRepository;
+import com.furelise.skillmanagement.user.model.User;
+import com.furelise.skillmanagement.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +74,9 @@ public class ReputationServiceImpl implements ReputationService {
     private final AiNewsLikeRepository aiNewsLikeRepository;
     private final AiNewsViewLogRepository aiNewsViewLogRepository;
     private final AiNewsCommentVoteRepository aiNewsCommentVoteRepository;
+    private final SkillRequestRepository skillRequestRepository;
+    private final SkillRequestVoteRepository skillRequestVoteRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -307,6 +316,115 @@ public class ReputationServiceImpl implements ReputationService {
         return scoreRepository.save(row);
     }
 
+    @Override
+    @Transactional
+    public ReputationScore refreshSkillRequest(Long requestId) {
+        SkillRequest request = skillRequestRepository.findById(requestId).orElse(null);
+        if (request == null) {
+            return null;
+        }
+        // Lazy auto-confirm (Q8) is evaluated before scoring, so a request
+        // whose 7-day window has passed scores as FULFILLED on the next
+        // refresh (vote, propose/decision, or detail read).
+        request = evaluateAutoConfirm(request);
+
+        // Q6 (BA §14, chốt 18/11): only votes from verified users count.
+        // "Verified" = ACTIVE + enabled account (no email-verified flag
+        // exists on the user table — see SkillRequestVoteRepository).
+        long verifiedVotes = skillRequestVoteRepository.countVerifiedByRequestId(requestId);
+        long totalVotes = request.getVoteCount() == null ? 0 : request.getVoteCount();
+        long ageDays = Math.max(0, Duration.between(request.getCreatedAt(), Instant.now()).toDays());
+        boolean fulfilled = SkillRequest.FULFILLMENT_FULFILLED.equals(request.getFulfillmentStatus());
+        // score = min(verifiedVotes, 50)/50 * 100 * 0.5^(ageDays/30),
+        // +15 when FULFILLED (capped at 100). Requests live longer than
+        // news, hence the 30-day half-life (vs 7 days for news).
+        // Worked examples (age 0): 5 verified votes → 10.00 (NEW, below 70);
+        // 40 verified votes → 80.00 (TRUSTED); 40 votes + FULFILLED → 95.00
+        // (POPULAR); 50 votes at age 30d → 50.00 (NEW).
+        BigDecimal score = null;
+        String tier = "NEW";
+        if (verifiedVotes >= MIN_VERIFIED_VOTES) {
+            double base = Math.min(verifiedVotes, 50) / 50.0 * 100.0;
+            double decayed = base * Math.pow(0.5, ageDays / (double) REQUEST_HALF_LIFE_DAYS);
+            double scoreValue = fulfilled ? Math.min(100.0, decayed + FULFILLED_BOOST) : decayed;
+            score = BigDecimal.valueOf(scoreValue).setScale(2, RoundingMode.HALF_UP);
+            if (scoreValue >= POPULAR_THRESHOLD) {
+                tier = "POPULAR";
+            } else if (scoreValue >= TRUSTED_THRESHOLD) {
+                tier = "TRUSTED";
+            }
+            // verifiedVotes >= 5 but score < 70: tier stays NEW and the
+            // (non-null) score is shown.
+        }
+
+        ReputationScore row = scoreRepository.findById(new ReputationScoreId("SKILL_REQUEST", requestId))
+                .orElse(ReputationScore.builder()
+                        .id(new ReputationScoreId("SKILL_REQUEST", requestId)).build());
+        row.setScore(score);
+        row.setTier(tier);
+        // Column mapping for requests (no stars, no downloads): ratingCount
+        // holds the verified vote count, downloadCount holds the total vote
+        // count (same reuse pattern as AI News).
+        row.setRatingCount((int) verifiedVotes);
+        row.setRatingAvg(null);
+        row.setDownloadCount((int) totalVotes);
+        row.setSuccessRate(null);
+        row.setUpdatedAt(Instant.now());
+        row.setSignals(Map.of(
+                "verifiedVotes", verifiedVotes,
+                "totalVotes", totalVotes,
+                "ageDays", ageDays,
+                "fulfilled", fulfilled,
+                "fulfilledSkillId", request.getFulfilledSkillId() == null
+                        ? 0 : request.getFulfilledSkillId()));
+        ReputationScore saved = scoreRepository.save(row);
+        // Fulfilled count feeds the contributor tier (BA §9.3): refresh the
+        // author of the fulfilling skill when the request is fulfilled.
+        if (fulfilled && request.getFulfilledSkillId() != null) {
+            Skill skill = skillRepository.findById(request.getFulfilledSkillId()).orElse(null);
+            if (skill != null && skill.getCreatedBy() != null) {
+                refreshContributor(skill.getCreatedBy());
+            }
+        }
+        return saved;
+    }
+
+    /**
+     * Lazy auto-confirm (GĐ5, Q8 chốt 18/11): a PENDING_CONFIRM request whose
+     * 7-day decision window has passed becomes FULFILLED if the linked skill
+     * still meets the bar (APPROVED and not deleted); otherwise it reverts
+     * to OPEN (link + deadline cleared) so it can be proposed again.
+     * Runs on every refreshSkillRequest and on request detail read (which
+     * calls refreshSkillRequest when the deadline has passed). A nightly
+     * scheduled job for this is still pending (BA §9.5) — until then, a
+     * request whose deadline passed but nobody refreshed it keeps its
+     * PENDING_CONFIRM status in the feed.
+     */
+    private SkillRequest evaluateAutoConfirm(SkillRequest request) {
+        if (!SkillRequest.FULFILLMENT_PENDING_CONFIRM.equals(request.getFulfillmentStatus())) {
+            return request;
+        }
+        if (request.getFulfillmentDeadline() == null
+                || Instant.now().isBefore(request.getFulfillmentDeadline())) {
+            return request;
+        }
+        Skill skill = request.getFulfilledSkillId() == null ? null
+                : skillRepository.findById(request.getFulfilledSkillId()).orElse(null);
+        boolean stillQualifies = skill != null
+                && Skill.STATUS_APPROVED.equals(skill.getApprovalStatus())
+                && !"Y".equals(skill.getDeletedYn());
+        if (stillQualifies) {
+            request.setFulfillmentStatus(SkillRequest.FULFILLMENT_FULFILLED);
+            request.setFulfilledAt(Instant.now());
+        } else {
+            request.setFulfillmentStatus(SkillRequest.FULFILLMENT_OPEN);
+            request.setFulfilledSkillId(null);
+            request.setFulfillmentDeadline(null);
+            request.setFulfilledAt(null);
+        }
+        return skillRequestRepository.save(request);
+    }
+
     /**
      * Wilson score lower bound (z = 1.96, 95%) for k successes out of n
      * trials — the small-sample-safe rate used for AI News like/view
@@ -347,18 +465,31 @@ public class ReputationServiceImpl implements ReputationService {
                 .filter(s -> s.getScore() != null)
                 .mapToDouble(s -> s.getScore().doubleValue())
                 .average().orElse(0.0);
-        // Fulfilled requests: 0 until Q8 (BA §14) defines FULFILLED — the
-        // bounty-based count was dropped with the bounty phase (giai đoạn sau).
+        // Fulfilled requests (GĐ5, Q8): requests whose fulfilling skill was
+        // created by this user — counted from skill_requests directly (the
+        // fulfillment link), not from comments.
         int fulfilled = 0;
+        if (!skillItems.isEmpty()) {
+            fulfilled = (int) skillRequestRepository.countByFulfilledSkillIdInAndFulfillmentStatus(
+                    skillItems.stream().map(Skill::getId).toList(),
+                    SkillRequest.FULFILLMENT_FULFILLED);
+        }
 
+        // Tier rules (BA §9.3, extended GĐ5 with fulfilled requests):
+        // NEW_MEMBER: no items and no fulfilled requests.
+        // VERIFIED: >= 1 item OR >= 1 fulfilled request.
+        // TRUSTED_AUTHOR: (>= 3 items OR >= 3 fulfilled) AND avg >= 70.
+        // EXPERT: (>= 5 items OR >= 5 fulfilled) AND avg >= 85.
+        // The average-score gate applies to every path: fulfilling requests
+        // alone never promotes an author whose items score poorly.
         String tier = "NEW_MEMBER";
-        if (itemCount > 0) {
+        if (itemCount > 0 || fulfilled > 0) {
             tier = "VERIFIED";
         }
-        if (itemCount >= 3 && avgScore >= TRUSTED_THRESHOLD) {
+        if ((itemCount >= 3 || fulfilled >= 3) && avgScore >= TRUSTED_THRESHOLD) {
             tier = "TRUSTED_AUTHOR";
         }
-        if (itemCount >= 5 && avgScore >= POPULAR_THRESHOLD) {
+        if ((itemCount >= 5 || fulfilled >= 5) && avgScore >= POPULAR_THRESHOLD) {
             tier = "EXPERT";
         }
 
@@ -371,6 +502,24 @@ public class ReputationServiceImpl implements ReputationService {
         row.setFulfilledRequests(fulfilled);
         row.setUpdatedAt(Instant.now());
         contributorRepository.save(row);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ContributorResponse getContributor(Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        ContributorReputation row = contributorRepository.findById(userId).orElse(null);
+        if (row == null) {
+            return new ContributorResponse(userId,
+                    user == null ? null : user.getName(),
+                    user == null ? null : user.getAvatarUrl(),
+                    "NEW_MEMBER", 0, null, 0, 0);
+        }
+        return new ContributorResponse(userId,
+                user == null ? null : user.getName(),
+                user == null ? null : user.getAvatarUrl(),
+                row.getTier(), row.getItemCount(), row.getAvgScore(),
+                row.getFulfilledRequests(), row.getReportCount());
     }
 
     @Override
@@ -405,6 +554,7 @@ public class ReputationServiceImpl implements ReputationService {
         switch (type) {
             case "AI_TOOL" -> explainAiTool(row, reasons);
             case "AI_NEWS" -> explainAiNews(row, reasons);
+            case "SKILL_REQUEST" -> explainSkillRequest(row, reasons);
             default -> explainRated(row, reasons);
         }
         BigDecimal score = row == null ? null : row.getScore();
@@ -440,6 +590,29 @@ public class ReputationServiceImpl implements ReputationService {
             reasons.add("Tool không có đánh giá sao — điểm uy tín tính từ lượt tải.");
         } else {
             reasons.add(downloads + " lượt tải — điểm uy tín tính từ lượt tải (tool không có đánh giá sao).");
+            addTierReason(row, reasons);
+        }
+    }
+
+    /** Reasons for a skill request: verified votes + age decay + fulfillment. */
+    private void explainSkillRequest(ReputationScore row, List<String> reasons) {
+        long verifiedVotes = row == null ? 0 : row.getRatingCount();
+        long totalVotes = row == null ? 0 : row.getDownloadCount();
+        if (row == null || verifiedVotes < MIN_VERIFIED_VOTES) {
+            reasons.add("Mới: cần thêm " + (MIN_VERIFIED_VOTES - verifiedVotes)
+                    + " lượt bình chọn nữa để có hạng (hiện có " + verifiedVotes
+                    + "/" + MIN_VERIFIED_VOTES + ").");
+            reasons.add("Chỉ tính lượt bình chọn của tài khoản đang hoạt động.");
+        } else {
+            reasons.add(verifiedVotes + " lượt bình chọn từ tài khoản đang hoạt động"
+                    + (totalVotes > verifiedVotes ? " (" + totalVotes + " lượt tất cả)." : "."));
+            long ageDays = signalLong(row, "ageDays");
+            if (ageDays >= REQUEST_HALF_LIFE_DAYS) {
+                reasons.add("Đăng cách đây " + ageDays + " ngày — điểm giảm dần theo thời gian.");
+            }
+            if (signalBoolean(row, "fulfilled")) {
+                reasons.add("Đã được đáp ứng (+15 điểm).");
+            }
             addTierReason(row, reasons);
         }
     }
@@ -484,6 +657,14 @@ public class ReputationServiceImpl implements ReputationService {
         }
         Object value = row.getSignals().get(key);
         return value instanceof Number number ? number.longValue() : 0;
+    }
+
+    private static boolean signalBoolean(ReputationScore row, String key) {
+        if (row == null || row.getSignals() == null) {
+            return false;
+        }
+        Object value = row.getSignals().get(key);
+        return value instanceof Boolean b && b;
     }
 
     private ReputationResponse toResponse(ReputationScore row) {

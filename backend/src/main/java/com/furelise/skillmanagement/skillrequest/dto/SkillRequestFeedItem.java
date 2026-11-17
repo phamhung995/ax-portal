@@ -27,6 +27,18 @@ public record SkillRequestFeedItem(
         /** The two newest comments (preview). */
         List<TopCommentItem> topComments,
         /** Attachments: images render in the grid, other files as download links. */
-        List<SkillRequestFileItem> files
+        List<SkillRequestFileItem> files,
+        /** Cached reputation score (null = not enough verified votes yet, NEW). */
+        Double reputationScore,
+        /** NEW | TRUSTED | POPULAR. */
+        String reputationTier,
+        /** Fulfillment (GĐ5, Q8): OPEN | PENDING_CONFIRM | FULFILLED. */
+        String fulfillmentStatus,
+        /** Skill proposed/accepted as the answer (null unless pending/fulfilled). */
+        Long fulfilledSkillId,
+        /** Name of the fulfilling skill (null unless pending/fulfilled). */
+        String fulfilledSkillName,
+        /** Requester decision deadline (null unless PENDING_CONFIRM). */
+        Instant fulfillmentDeadline
 ) {
 }

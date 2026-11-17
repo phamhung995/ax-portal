@@ -79,6 +79,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/contributors/:userId',
+      name: 'contributor-profile',
+      component: () => import('@/features/users/views/ContributorProfileView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/ai-tools',
       name: 'ai-tools',
       component: () => import('@/features/ai-tools/views/AiToolManagementView.vue'),

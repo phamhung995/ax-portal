@@ -19,9 +19,23 @@ export interface ReputationExplain {
   reasons: string[]
 }
 
+export interface ContributorReputation {
+  userId: number
+  userName: string | null
+  avatarUrl: string | null
+  tier: string
+  itemCount: number
+  avgScore: number | null
+  fulfilledRequests: number
+  reportCount: number
+}
+
 export const reputationApi = {
   get: (targetType: string, targetId: number) =>
     request<Reputation>(api.get(`/reputation/${targetType}/${targetId}`)),
   explain: (targetType: string, targetId: number) =>
     request<ReputationExplain>(api.get(`/reputation/${targetType}/${targetId}/explain`)),
+  /** Contributor (author) reputation (GĐ5, BA §8.5). */
+  contributor: (userId: number) =>
+    request<ContributorReputation>(api.get(`/reputation/CONTRIBUTOR/${userId}`)),
 }
