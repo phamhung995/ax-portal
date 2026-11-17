@@ -138,6 +138,17 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("TOKEN_REUSED", ex.getMessage()));
     }
 
+    /**
+     * Companion-app auth failures (GĐ6, BA Q5): 401 missing/invalid token,
+     * 403 bad HMAC signature, 429 rate limit, 503 token not configured
+     * (fail closed). The exception carries its own status and code.
+     */
+    @ExceptionHandler(CompanionAuthException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCompanionAuth(CompanionAuthException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         // Technical details are never exposed (SRS security rule) — but log

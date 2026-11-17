@@ -27,6 +27,9 @@ public interface ReputationService {
     /** Half-life (days) of the AI News time decay (BA §9.1, Q4 defaults). */
     int NEWS_HALF_LIFE_DAYS = 7;
 
+    /** Minimum number of installs before the success rate enters a score. */
+    int MIN_INSTALLS = 5;
+
     /** Bayesian prior weight (a "virtual" 10 ratings at the global mean). */
     int BAYESIAN_PRIOR = 10;
 

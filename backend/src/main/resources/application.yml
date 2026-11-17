@@ -63,6 +63,18 @@ jwt:
     cron: ${JWT_CLEANUP_CRON:0 0 2 * * ?}               # 2:00 AM daily
 
 
+# ====================== Companion App (install events, GĐ6 / BA Q5) ======================
+# The companion app reports 1-click install outcomes to
+# POST /api/v1/reputation/install-events. Auth (Q5, chốt 18/11): a dedicated
+# companion token + rate-limit + HMAC-SHA256 signature of the raw body.
+# The token is set via env COMPANION_TOKEN on the server and shared with the
+# companion team out of band — NEVER commit a real token. Empty token =
+# the endpoint refuses all calls (fail closed, 503).
+ax-portal:
+  companion:
+    token: ${COMPANION_TOKEN:}
+    rate-limit-per-minute: ${COMPANION_RATE_LIMIT_PER_MINUTE:120}
+
 # ====================== Knox C&C Suite Mail API Configuration ======================
 # Knox Mail API v2.0 (Knox Developers Center). When KNOX_MAIL_SYSTEM_ID is set,
 # KnoxMailServiceImpl is used; otherwise LogEmailServiceImpl (dev mode: OTP is

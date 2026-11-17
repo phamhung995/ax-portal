@@ -11,6 +11,7 @@ import com.furelise.skillmanagement.mcp.repository.McpMasterRepository;
 import com.furelise.skillmanagement.mcp.repository.McpRatingRepository;
 import com.furelise.skillmanagement.reputation.model.ReputationScore;
 import com.furelise.skillmanagement.reputation.repository.ContributorReputationRepository;
+import com.furelise.skillmanagement.reputation.repository.InstallEventRepository;
 import com.furelise.skillmanagement.reputation.repository.ReputationScoreRepository;
 import com.furelise.skillmanagement.reputation.service.impl.ReputationServiceImpl;
 import com.furelise.skillmanagement.skill.model.Skill;
@@ -45,6 +46,7 @@ class ReputationSkillRequestTest {
 
     @Mock private ReputationScoreRepository scoreRepository;
     @Mock private ContributorReputationRepository contributorRepository;
+    @Mock private InstallEventRepository installEventRepository;
     @Mock private SkillRatingRepository ratingRepository;
     @Mock private SkillDownloadLogRepository downloadLogRepository;
     @Mock private SkillRepository skillRepository;

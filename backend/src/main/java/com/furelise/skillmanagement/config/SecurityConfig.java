@@ -64,6 +64,10 @@ public class SecurityConfig {
                         .requestMatchers("GET", "/api/v1/update/latest").permitAll()
                         .requestMatchers("GET", "/api/v1/update/download/**").permitAll()
                         .requestMatchers("/api/v1/update/**").authenticated()
+                        // Companion install-events (GĐ6, BA FR-6/Q5): machine-to-machine,
+                        // authenticated by its own companion token + HMAC signature in
+                        // the controller, NOT by the user JWT — hence permitAll here.
+                        .requestMatchers("POST", "/api/v1/reputation/install-events").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

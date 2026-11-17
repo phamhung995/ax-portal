@@ -19,8 +19,10 @@ import com.furelise.skillmanagement.reputation.model.ContributorReputation;
 import com.furelise.skillmanagement.reputation.model.ReputationScore;
 import com.furelise.skillmanagement.reputation.model.ReputationScoreId;
 import com.furelise.skillmanagement.reputation.repository.ContributorReputationRepository;
+import com.furelise.skillmanagement.reputation.repository.InstallEventRepository;
 import com.furelise.skillmanagement.reputation.repository.ReputationScoreRepository;
 import com.furelise.skillmanagement.reputation.service.ReputationService;
+import com.furelise.skillmanagement.reputation.service.WilsonScore;
 import com.furelise.skillmanagement.skill.model.Skill;
 import com.furelise.skillmanagement.skill.repository.SkillDownloadLogRepository;
 import com.furelise.skillmanagement.skill.repository.SkillRatingRepository;
@@ -47,9 +49,10 @@ import java.util.stream.Collectors;
 
 /**
  * Reputation core implementation (guide §2).
- * Skill score = 80% Bayesian rating quality + 20% download popularity.
- * No install events exist yet (desktop API was deleted), so success_rate
- * stays NULL until the companion app reports installs (phase 2).
+ * Skill/MCP score = 80% Bayesian rating quality + 20% download popularity,
+ * or — once >= 5 install events exist (GĐ6, BA §9.1) — 60% quality +
+ * 30% Wilson install-success rate + 10% popularity. success_rate stays
+ * NULL until the companion app reports installs.
  */
 @Service
 @RequiredArgsConstructor
@@ -62,6 +65,7 @@ public class ReputationServiceImpl implements ReputationService {
 
     private final ReputationScoreRepository scoreRepository;
     private final ContributorReputationRepository contributorRepository;
+    private final InstallEventRepository installEventRepository;
     private final SkillRatingRepository ratingRepository;
     private final SkillDownloadLogRepository downloadLogRepository;
     private final SkillRepository skillRepository;
@@ -99,6 +103,7 @@ public class ReputationServiceImpl implements ReputationService {
         BigDecimal globalMean = ratingRepository.averageRating();
         double m = globalMean != null ? globalMean.doubleValue() : DEFAULT_GLOBAL_MEAN;
         long downloads = downloadLogRepository.countBySkillIdAndUserIdNot(skillId, skill.getCreatedBy());
+        InstallStats installs = installStats("SKILL", skillId);
 
         BigDecimal bayes = null;
         BigDecimal score = null;
@@ -109,7 +114,10 @@ public class ReputationServiceImpl implements ReputationService {
             bayes = BigDecimal.valueOf(bayesValue).setScale(2, RoundingMode.HALF_UP);
             double quality = bayesValue / 5.0;
             double popularity = Math.min(Math.log10(downloads + 1) / 2.0, 1.0);
-            double scoreValue = (0.8 * quality + 0.2 * popularity) * 100.0;
+            // GĐ6 (BA §9.1): once >= MIN_INSTALLS installs exist, the Wilson
+            // install-success rate joins the score (0.6/0.3/0.1); otherwise
+            // the original 0.8/0.2 blend (too few installs to trust yet).
+            double scoreValue = installAwareScore(quality, popularity, installs);
             score = BigDecimal.valueOf(scoreValue).setScale(2, RoundingMode.HALF_UP);
             if (scoreValue >= POPULAR_THRESHOLD && downloads >= POPULAR_MIN_DOWNLOADS) {
                 tier = "POPULAR";
@@ -128,12 +136,16 @@ public class ReputationServiceImpl implements ReputationService {
         row.setRatingCount((int) ratingCount);
         row.setRatingAvg(bayes);
         row.setDownloadCount((int) downloads);
+        row.setSuccessRate(installs.total() > 0
+                ? BigDecimal.valueOf(installs.wilson()).setScale(4, RoundingMode.HALF_UP) : null);
         row.setUpdatedAt(Instant.now());
         row.setSignals(Map.of(
                 "ratingCount", ratingCount,
                 "ratingAvgRaw", avg != null ? avg.doubleValue() : 0.0,
                 "globalMean", m,
-                "downloads", downloads));
+                "downloads", downloads,
+                "installSuccess", installs.successes(),
+                "installTotal", installs.total()));
         ReputationScore saved = scoreRepository.save(row);
         // Contributor tier derives from the author's item scores (BA §9.3),
         // so a skill-score change refreshes the author too.
@@ -162,6 +174,7 @@ public class ReputationServiceImpl implements ReputationService {
         BigDecimal globalMean = mcpRatingRepository.averageRating();
         double m = globalMean != null ? globalMean.doubleValue() : DEFAULT_GLOBAL_MEAN;
         long downloads = mcpDownloadLogRepository.countByMcpIdAndUserIdNot(mcpId, mcp.getCreatedBy());
+        InstallStats installs = installStats("MCP", mcpId);
 
         BigDecimal bayes = null;
         BigDecimal score = null;
@@ -172,7 +185,8 @@ public class ReputationServiceImpl implements ReputationService {
             bayes = BigDecimal.valueOf(bayesValue).setScale(2, RoundingMode.HALF_UP);
             double quality = bayesValue / 5.0;
             double popularity = Math.min(Math.log10(downloads + 1) / 2.0, 1.0);
-            double scoreValue = (0.8 * quality + 0.2 * popularity) * 100.0;
+            // GĐ6 (BA §9.1): same install-aware blend as Skill.
+            double scoreValue = installAwareScore(quality, popularity, installs);
             score = BigDecimal.valueOf(scoreValue).setScale(2, RoundingMode.HALF_UP);
             if (scoreValue >= POPULAR_THRESHOLD && downloads >= POPULAR_MIN_DOWNLOADS) {
                 tier = "POPULAR";
@@ -191,12 +205,16 @@ public class ReputationServiceImpl implements ReputationService {
         row.setRatingCount((int) ratingCount);
         row.setRatingAvg(bayes);
         row.setDownloadCount((int) downloads);
+        row.setSuccessRate(installs.total() > 0
+                ? BigDecimal.valueOf(installs.wilson()).setScale(4, RoundingMode.HALF_UP) : null);
         row.setUpdatedAt(Instant.now());
         row.setSignals(Map.of(
                 "ratingCount", ratingCount,
                 "ratingAvgRaw", avg != null ? avg.doubleValue() : 0.0,
                 "globalMean", m,
-                "downloads", downloads));
+                "downloads", downloads,
+                "installSuccess", installs.successes(),
+                "installTotal", installs.total()));
         ReputationScore saved = scoreRepository.save(row);
         // Contributor tier derives from the author's item scores (BA §9.3),
         // so an MCP-score change refreshes the author too.
@@ -271,7 +289,7 @@ public class ReputationServiceImpl implements ReputationService {
         long views = aiNewsViewLogRepository.countByNewsId(newsId);
         long commentVotes = aiNewsCommentVoteRepository.countVotesByNewsId(newsId);
         long ageDays = Math.max(0, Duration.between(news.getCreatedAt(), Instant.now()).toDays());
-        double wilson = wilsonLowerBound(likes, views);
+        double wilson = WilsonScore.lowerBound(likes, views);
         // score = wilson * 100 * 0.5^(ageDays / 7) — 7-day half-life (BA §9.1,
         // Q4 defaults). Comment votes enter the explain breakdown only,
         // NOT the score.
@@ -425,21 +443,27 @@ public class ReputationServiceImpl implements ReputationService {
         return skillRequestRepository.save(request);
     }
 
+    /** Install outcomes for one item: counts + Wilson lower bound. */
+    private record InstallStats(long total, long successes, double wilson) {
+    }
+
+    private InstallStats installStats(String targetType, Long targetId) {
+        long total = installEventRepository.countByTargetTypeAndTargetId(targetType, targetId);
+        long successes = installEventRepository
+                .countByTargetTypeAndTargetIdAndSuccessTrue(targetType, targetId);
+        return new InstallStats(total, successes, WilsonScore.lowerBound(successes, total));
+    }
+
     /**
-     * Wilson score lower bound (z = 1.96, 95%) for k successes out of n
-     * trials — the small-sample-safe rate used for AI News like/view
-     * (BA §9.1: "Wilson for rates"). 0 when there are no trials.
+     * Install-aware score (GĐ6, BA §9.1): once >= MIN_INSTALLS installs exist,
+     * score = (0.6*quality + 0.3*wilson + 0.1*popularity)*100; otherwise the
+     * original 0.8/0.2 blend (too few installs to trust the success rate yet).
      */
-    private static double wilsonLowerBound(long successes, long trials) {
-        if (trials <= 0) {
-            return 0.0;
+    private double installAwareScore(double quality, double popularity, InstallStats installs) {
+        if (installs.total() >= MIN_INSTALLS) {
+            return (0.6 * quality + 0.3 * installs.wilson() + 0.1 * popularity) * 100.0;
         }
-        double z = 1.96;
-        double p = (double) successes / trials;
-        double denom = 1.0 + z * z / trials;
-        double centre = p + z * z / (2.0 * trials);
-        double margin = z * Math.sqrt((p * (1.0 - p) + z * z / (4.0 * trials)) / trials);
-        return Math.max(0.0, (centre - margin) / denom);
+        return (0.8 * quality + 0.2 * popularity) * 100.0;
     }
 
     @Override
@@ -573,11 +597,23 @@ public class ReputationServiceImpl implements ReputationService {
             int have = row == null ? 0 : row.getRatingCount();
             reasons.add("Mới: cần thêm " + (MIN_RATINGS - have)
                     + " lượt đánh giá nữa để có hạng (hiện có " + have + "/" + MIN_RATINGS + ").");
+            addInstallReason(row, reasons);
         } else {
             reasons.add("Điểm Bayesian " + row.getRatingAvg() + "/5 từ "
                     + row.getRatingCount() + " lượt đánh giá.");
             reasons.add(row.getDownloadCount() + " lượt tải.");
+            addInstallReason(row, reasons);
             addTierReason(row, reasons);
+        }
+    }
+
+    /** Install-success line, shown when the item has install data (GĐ6). */
+    private void addInstallReason(ReputationScore row, List<String> reasons) {
+        long installTotal = signalLong(row, "installTotal");
+        long installSuccess = signalLong(row, "installSuccess");
+        if (installTotal > 0) {
+            reasons.add("Cài thành công " + installSuccess + "/" + installTotal + " lượt ("
+                    + String.format(Locale.ROOT, "%.0f", 100.0 * installSuccess / installTotal) + "%).");
         }
     }
 
