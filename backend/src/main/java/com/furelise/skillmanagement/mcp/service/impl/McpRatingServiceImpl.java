@@ -10,6 +10,7 @@ import com.furelise.skillmanagement.mcp.repository.McpRatingRepository;
 import com.furelise.skillmanagement.mcp.service.McpAccessHelper;
 import com.furelise.skillmanagement.mcp.service.McpRatingService;
 import com.furelise.skillmanagement.notification.service.EventNotificationService;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.user.model.User;
 import com.furelise.skillmanagement.user.model.UserSettings;
 import com.furelise.skillmanagement.user.repository.UserRepository;
@@ -41,6 +42,7 @@ public class McpRatingServiceImpl implements McpRatingService {
     private final EventNotificationService eventNotificationService;
     private final McpAccessHelper mcpAccessHelper;
     private final RateLimiter rateLimiter;
+    private final ReputationService reputationService;
 
     @Value("${app.base-url:}")
     private String appBaseUrl;
@@ -89,6 +91,10 @@ public class McpRatingServiceImpl implements McpRatingService {
                         .build());
         existing.setRating(BigDecimal.valueOf(rating).setScale(1, RoundingMode.HALF_UP));
         mcpRatingRepository.save(existing);
+
+        // Reputation: a new rating moves the MCP's cached score.
+        // (Q2: the creator's own rating is stored but excluded from the score.)
+        reputationService.refreshMcp(mcpId);
 
         notifyCreator(mcp, user, existing.getRating());
         return getRating(mcpId);

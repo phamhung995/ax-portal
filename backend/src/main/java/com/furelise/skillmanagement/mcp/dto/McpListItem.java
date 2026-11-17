@@ -21,6 +21,10 @@ public record McpListItem(
         long ratingCount,
         boolean subscribed,
         boolean hasPendingVersion,
-        long downloadCount
+        long downloadCount,
+        /** Cached reputation score (0-100, null = not enough ratings yet). */
+        Double reputationScore,
+        /** NEW | TRUSTED | POPULAR. */
+        String reputationTier
 ) {
 }

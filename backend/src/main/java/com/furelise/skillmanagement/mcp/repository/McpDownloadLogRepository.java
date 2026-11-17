@@ -19,4 +19,7 @@ public interface McpDownloadLogRepository extends JpaRepository<McpDownloadLog, 
 
     /** All download events of a set of MCPs (grid "Downloads" column). */
     List<McpDownloadLog> findByMcpIdIn(Collection<Long> mcpIds);
+
+    /** Download count of one MCP, excluding the creator's own downloads. */
+    long countByMcpIdAndUserIdNot(Long mcpId, Long userId);
 }

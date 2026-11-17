@@ -18,6 +18,8 @@ import com.furelise.skillmanagement.mcp.util.McpCodeGenerator;
 import com.furelise.skillmanagement.mcp.util.ServerKeyGenerator;
 import com.furelise.skillmanagement.notification.service.EventNotificationService;
 import com.furelise.skillmanagement.audit.service.AuditService;
+import com.furelise.skillmanagement.reputation.model.ReputationScore;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.skill.model.Skill;
 import com.furelise.skillmanagement.skill.repository.SkillRepository;
 import com.furelise.skillmanagement.user.model.User;
@@ -121,6 +123,7 @@ public class McpServiceImpl implements McpService {
     private final UserSettingsRepository userSettingsRepository;
     private final EventNotificationService eventNotificationService;
     private final AuditService auditService;
+    private final ReputationService reputationService;
 
     // ------------------------------------------------------------------
     // Create (Add SRS §4)
@@ -429,6 +432,7 @@ public class McpServiceImpl implements McpService {
             case "name" -> "mcpName";
             case "viewcount" -> "viewCount";
             case "avgrating" -> "avgRating";
+            case "reputation" -> "reputation";
             default -> "createdAt";
         };
 
@@ -436,25 +440,38 @@ public class McpServiceImpl implements McpService {
                 McpMasterRepository.visibleTo(viewer),
                 searchCriteria(request, viewer, true));
 
-        // avgRating has no entity column — sort in memory by the per-MCP
-        // rating average (nulls last), then page manually.
+        // avgRating and reputation have no entity column — sort in memory
+        // (rating average / cached reputation score, nulls last), then page manually.
         List<McpMaster> mcps;
         long total;
-        if ("avgRating".equals(sortBy)) {
+        if ("avgRating".equals(sortBy) || "reputation".equals(sortBy)) {
             List<McpMaster> all = mcpMasterRepository.findAll(spec,
                     Sort.by(Sort.Direction.DESC, "createdAt"));
-            Map<Long, Double> avgByMcp = new LinkedHashMap<>();
-            if (!all.isEmpty()) {
-                for (Object[] row : mcpRatingRepository.ratingAggByMcpIdIn(
-                        all.stream().map(McpMaster::getId).toList())) {
-                    avgByMcp.put((Long) row[0], ((Number) row[1]).doubleValue());
+            if ("reputation".equals(sortBy)) {
+                // Cached reputation_scores (null = not enough ratings yet, sorts last).
+                Map<Long, ReputationScore> scores = reputationService.getReputations(
+                        "MCP", all.stream().map(McpMaster::getId).toList());
+                Comparator<McpMaster> byRep = Comparator.comparingDouble(
+                        (McpMaster m) -> scores.get(m.getId()) != null
+                                && scores.get(m.getId()).getScore() != null
+                                ? scores.get(m.getId()).getScore().doubleValue() : -1.0).reversed();
+                // Same deterministic tie-break as avgRating (see below).
+                all.sort(byRep.thenComparing(McpMaster::getCreatedAt,
+                        Comparator.reverseOrder()).thenComparing(McpMaster::getId));
+            } else {
+                Map<Long, Double> avgByMcp = new LinkedHashMap<>();
+                if (!all.isEmpty()) {
+                    for (Object[] row : mcpRatingRepository.ratingAggByMcpIdIn(
+                            all.stream().map(McpMaster::getId).toList())) {
+                        avgByMcp.put((Long) row[0], ((Number) row[1]).doubleValue());
+                    }
                 }
+                Comparator<McpMaster> byAvg = Comparator.comparingDouble(
+                        (McpMaster m) -> avgByMcp.getOrDefault(m.getId(), 0.0)).reversed();
+                // PK tie-break: deterministic page boundaries (same rule as Skill list).
+                all.sort(byAvg.thenComparing(McpMaster::getCreatedAt,
+                        Comparator.reverseOrder()).thenComparing(McpMaster::getId));
             }
-            Comparator<McpMaster> byAvg = Comparator.comparingDouble(
-                    (McpMaster m) -> avgByMcp.getOrDefault(m.getId(), 0.0)).reversed();
-            // PK tie-break: deterministic page boundaries (same rule as Skill list).
-            all.sort(byAvg.thenComparing(McpMaster::getCreatedAt,
-                    Comparator.reverseOrder()).thenComparing(McpMaster::getId));
             total = all.size();
             int from = Math.min((page - 1) * pageSize, all.size());
             int to = Math.min(from + pageSize, all.size());
@@ -470,6 +487,7 @@ public class McpServiceImpl implements McpService {
 
         Map<Long, User> creators = loadCreators(mcps);
         Map<Long, RatingAgg> ratings = loadRatings(mcps);
+        Map<Long, ReputationScore> reputations = loadReputations(mcps);
         Set<Long> subscribed = loadSubscribed(mcps, viewer.getId());
         Map<Long, List<String>> categoriesByMcp = loadCategoryNames(mcps);
         Map<Long, List<String>> stagesByMcp = loadStageNames(mcps);
@@ -493,7 +511,10 @@ public class McpServiceImpl implements McpService {
                     agg != null ? agg.count() : 0L,
                     subscribed.contains(m.getId()),
                     m.isVersionUpdatePending(),
-                    downloadCounts.getOrDefault(m.getId(), 0L));
+                    downloadCounts.getOrDefault(m.getId(), 0L),
+                    reputations.get(m.getId()) != null && reputations.get(m.getId()).getScore() != null
+                            ? reputations.get(m.getId()).getScore().doubleValue() : null,
+                    reputations.get(m.getId()) != null ? reputations.get(m.getId()).getTier() : "NEW");
         }).toList();
 
         return new McpSearchResult(total, page, pageSize, items,
@@ -809,6 +830,10 @@ public class McpServiceImpl implements McpService {
                 .userId(user.getId())
                 .downloadAll(downloadAll)
                 .build());
+        // Reputation (BA §9.5): a new download is a signal too — refresh the
+        // cached score so popularity (download count) never goes stale until
+        // the next rating.
+        reputationService.refreshMcp(mcpId);
     }
 
     // ------------------------------------------------------------------
@@ -1324,6 +1349,14 @@ public class McpServiceImpl implements McpService {
                 .entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey,
                         e -> new RatingAgg(e.getValue().average() / e.getValue().count(), e.getValue().count())));
+    }
+
+    private Map<Long, ReputationScore> loadReputations(List<McpMaster> mcps) {
+        if (mcps.isEmpty()) {
+            return Map.of();
+        }
+        return reputationService.getReputations("MCP",
+                mcps.stream().map(McpMaster::getId).toList());
     }
 
     private Set<Long> loadSubscribed(List<McpMaster> mcps, Long viewerId) {

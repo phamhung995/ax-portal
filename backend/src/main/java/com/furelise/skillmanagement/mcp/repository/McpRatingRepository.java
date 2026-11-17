@@ -17,6 +17,21 @@ public interface McpRatingRepository extends JpaRepository<McpRating, Long> {
     @Query("SELECT AVG(r.rating) FROM McpRating r WHERE r.mcpId = :mcpId")
     BigDecimal averageRatingByMcpId(@org.springframework.data.repository.query.Param("mcpId") Long mcpId);
 
+    /**
+     * Q2 (BA §14, chốt 17/11): self-ratings do NOT count toward the score.
+     * Item average / count excluding the MCP creator's own rating.
+     */
+    @Query("SELECT AVG(r.rating) FROM McpRating r WHERE r.mcpId = :mcpId AND r.userId <> :userId")
+    BigDecimal averageRatingByMcpIdExcludingUser(
+            @org.springframework.data.repository.query.Param("mcpId") Long mcpId,
+            @org.springframework.data.repository.query.Param("userId") Long userId);
+
+    long countByMcpIdAndUserIdNot(Long mcpId, Long userId);
+
+    /** Global mean rating across all MCPs — the Bayesian prior mean. */
+    @Query("SELECT AVG(r.rating) FROM McpRating r")
+    BigDecimal averageRating();
+
     @Query("SELECT COUNT(r) FROM McpRating r WHERE r.mcpId = :mcpId")
     long countByMcpId(@org.springframework.data.repository.query.Param("mcpId") Long mcpId);
 

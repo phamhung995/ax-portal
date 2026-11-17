@@ -174,6 +174,11 @@ class SkillCoworkIntegrationTest {
             }
 
             @Override
+            public com.furelise.skillmanagement.reputation.model.ReputationScore refreshMcp(Long mcpId) {
+                return null;
+            }
+
+            @Override
             public void refreshContributor(Long userId) {
             }
 

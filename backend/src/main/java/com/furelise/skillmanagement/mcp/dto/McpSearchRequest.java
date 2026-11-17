@@ -10,7 +10,8 @@ import java.util.List;
  * <p>categoryIds: the MCP must have at least one of the given categories.
  * stageId: the MCP must be mapped to that process stage.
  * subscribed: "Y" (viewer is subscribed), "N" (viewer is not), null = all.
- * sortBy: "name", "viewCount" or "avgRating" (per-MCP average, nulls last).
+ * sortBy: "name", "viewCount", "avgRating" (per-MCP average, nulls last)
+ * or "reputation" (cached reputation score, nulls last).
  *
  * <p>PUBLIC only — no scope/system filter fields.
  */

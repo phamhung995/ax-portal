@@ -11,6 +11,7 @@ import com.furelise.skillmanagement.mcp.service.McpAccessHelper;
 import com.furelise.skillmanagement.mcp.service.impl.McpRatingServiceImpl;
 import com.furelise.skillmanagement.model.Role;
 import com.furelise.skillmanagement.notification.service.EventNotificationService;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.user.model.User;
 import com.furelise.skillmanagement.user.repository.UserRepository;
 import com.furelise.skillmanagement.user.repository.UserSettingsRepository;
@@ -37,6 +38,7 @@ class McpRatingServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private EventNotificationService eventNotificationService;
+    @Mock private ReputationService reputationService;
 
     @InjectMocks private McpRatingServiceImpl ratingService;
 

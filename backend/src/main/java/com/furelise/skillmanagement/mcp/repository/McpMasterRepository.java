@@ -20,6 +20,9 @@ public interface McpMasterRepository extends JpaRepository<McpMaster, Long>, Jpa
 
     List<McpMaster> findByDeletedYn(String deletedYn);
 
+    /** MCPs created by one user (contributor tier counts Skill + MCP items). */
+    List<McpMaster> findByCreatedBy(Long createdBy);
+
     List<McpMaster> findByIdIn(Collection<Long> ids);
 
     boolean existsByMcpNameIgnoreCaseAndDeletedYnAndCreatedBy(String mcpName, String deletedYn, Long createdBy);

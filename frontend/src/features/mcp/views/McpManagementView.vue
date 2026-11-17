@@ -17,6 +17,7 @@ import McpDetailPopup from './McpDetailPopup.vue'
 import SearchUserPopup from '@/features/skills/views/SearchUserPopup.vue'
 import ManageMcpTaxonomyPopup from './ManageMcpTaxonomyPopup.vue'
 import BadgeStack from '@/features/skills/views/BadgeStack.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
 import { mcpApi } from '@/features/mcp/api'
 import { toUserError } from '@/lib/api'
 import { stripHtml } from '@/lib/sanitize'
@@ -367,7 +368,7 @@ onMounted(() => {
     if (typeof q.createdFrom === 'string') s.createdDateFrom = q.createdFrom
     if (typeof q.createdTo === 'string') s.createdDateTo = q.createdTo
     if (q.subscribed === '1') s.subscribed = 'Y'
-    if (q.sortBy === 'viewCount' || q.sortBy === 'avgRating') {
+    if (q.sortBy === 'viewCount' || q.sortBy === 'avgRating' || q.sortBy === 'reputation') {
       s.sortBy = q.sortBy
       s.sortDirection = 'DESC'
     }
@@ -613,6 +614,10 @@ watch(
               ★ {{ (row as McpListItem).avgRating!.toFixed(1) }} ({{ (row as McpListItem).ratingCount }})
             </span>
             <span v-else class="sm-norating">{{ t('app.common.noRating') }}</span>
+            <ReputationBadge
+              :tier="(row as McpListItem).reputationTier"
+              :score="(row as McpListItem).reputationScore"
+            />
           </template>
           <template #cell-subscribe="{ row }">
             <button
@@ -689,6 +694,7 @@ watch(
               <span>{{ t('app.common.views', { n: item.viewCount }) }}</span>
               <span v-if="item.avgRating != null" class="sc-rating">★ {{ item.avgRating.toFixed(1) }}</span>
               <span v-else class="sc-norating">{{ t('app.common.noRating') }}</span>
+              <ReputationBadge :tier="item.reputationTier" :score="item.reputationScore" />
             </div>
           </div>
         </div>

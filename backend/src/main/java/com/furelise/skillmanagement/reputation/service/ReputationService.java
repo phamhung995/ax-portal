@@ -23,6 +23,9 @@ public interface ReputationService {
     /** Recompute and persist the score of one skill. */
     ReputationScore refreshSkill(Long skillId);
 
+    /** Recompute and persist the score of one MCP (same formula as Skill, GĐ3). */
+    ReputationScore refreshMcp(Long mcpId);
+
     /** Recompute and persist the contributor tier of one user. */
     void refreshContributor(Long userId);
 

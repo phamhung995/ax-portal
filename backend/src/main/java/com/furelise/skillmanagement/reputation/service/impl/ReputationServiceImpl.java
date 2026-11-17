@@ -1,5 +1,9 @@
 package com.furelise.skillmanagement.reputation.service.impl;
 
+import com.furelise.skillmanagement.mcp.model.McpMaster;
+import com.furelise.skillmanagement.mcp.repository.McpDownloadLogRepository;
+import com.furelise.skillmanagement.mcp.repository.McpMasterRepository;
+import com.furelise.skillmanagement.mcp.repository.McpRatingRepository;
 import com.furelise.skillmanagement.reputation.dto.ReputationExplainResponse;
 import com.furelise.skillmanagement.reputation.dto.ReputationResponse;
 import com.furelise.skillmanagement.reputation.model.ContributorReputation;
@@ -45,6 +49,9 @@ public class ReputationServiceImpl implements ReputationService {
     private final SkillRatingRepository ratingRepository;
     private final SkillDownloadLogRepository downloadLogRepository;
     private final SkillRepository skillRepository;
+    private final McpRatingRepository mcpRatingRepository;
+    private final McpDownloadLogRepository mcpDownloadLogRepository;
+    private final McpMasterRepository mcpMasterRepository;
 
     @Override
     @Transactional
@@ -113,12 +120,86 @@ public class ReputationServiceImpl implements ReputationService {
 
     @Override
     @Transactional
+    public ReputationScore refreshMcp(Long mcpId) {
+        McpMaster mcp = mcpMasterRepository.findById(mcpId).orElse(null);
+        if (mcp == null || "Y".equals(mcp.getDeletedYn())) {
+            return null;
+        }
+        // Q2 (BA §14, chốt 17/11) — same as Skill: the creator's own rating
+        // is stored but excluded from the score.
+        Long creatorId = mcp.getCreatedBy();
+        long ratingCount = creatorId == null
+                ? mcpRatingRepository.countByMcpId(mcpId)
+                : mcpRatingRepository.countByMcpIdAndUserIdNot(mcpId, creatorId);
+        BigDecimal avg = creatorId == null
+                ? mcpRatingRepository.averageRatingByMcpId(mcpId)
+                : mcpRatingRepository.averageRatingByMcpIdExcludingUser(mcpId, creatorId);
+        BigDecimal globalMean = mcpRatingRepository.averageRating();
+        double m = globalMean != null ? globalMean.doubleValue() : DEFAULT_GLOBAL_MEAN;
+        long downloads = mcpDownloadLogRepository.countByMcpIdAndUserIdNot(mcpId, mcp.getCreatedBy());
+
+        BigDecimal bayes = null;
+        BigDecimal score = null;
+        String tier = "NEW";
+        if (ratingCount >= MIN_RATINGS && avg != null) {
+            double bayesValue = (BAYESIAN_PRIOR * m + avg.doubleValue() * ratingCount)
+                    / (BAYESIAN_PRIOR + ratingCount);
+            bayes = BigDecimal.valueOf(bayesValue).setScale(2, RoundingMode.HALF_UP);
+            double quality = bayesValue / 5.0;
+            double popularity = Math.min(Math.log10(downloads + 1) / 2.0, 1.0);
+            double scoreValue = (0.8 * quality + 0.2 * popularity) * 100.0;
+            score = BigDecimal.valueOf(scoreValue).setScale(2, RoundingMode.HALF_UP);
+            if (scoreValue >= POPULAR_THRESHOLD && downloads >= POPULAR_MIN_DOWNLOADS) {
+                tier = "POPULAR";
+            } else if (scoreValue >= TRUSTED_THRESHOLD) {
+                tier = "TRUSTED";
+            }
+            // n >= 5 but score < 70: tier stays NEW and the (non-null) score is
+            // shown, so the user sees "not trusted yet" instead of hiding.
+        }
+
+        ReputationScore row = scoreRepository.findById(new ReputationScoreId("MCP", mcpId))
+                .orElse(ReputationScore.builder()
+                        .id(new ReputationScoreId("MCP", mcpId)).build());
+        row.setScore(score);
+        row.setTier(tier);
+        row.setRatingCount((int) ratingCount);
+        row.setRatingAvg(bayes);
+        row.setDownloadCount((int) downloads);
+        row.setUpdatedAt(Instant.now());
+        row.setSignals(Map.of(
+                "ratingCount", ratingCount,
+                "ratingAvgRaw", avg != null ? avg.doubleValue() : 0.0,
+                "globalMean", m,
+                "downloads", downloads));
+        ReputationScore saved = scoreRepository.save(row);
+        // Contributor tier derives from the author's item scores (BA §9.3),
+        // so an MCP-score change refreshes the author too.
+        if (mcp.getCreatedBy() != null) {
+            refreshContributor(mcp.getCreatedBy());
+        }
+        return saved;
+    }
+
+    @Override
+    @Transactional
     public void refreshContributor(Long userId) {
-        List<Skill> items = skillRepository.findByCreatedBy(userId).stream()
+        // Contributor tier derives from ALL of the author's items (BA §9.3):
+        // Skills (GĐ2) + MCPs (GĐ3). Each module contributes its own cached scores.
+        List<Skill> skillItems = skillRepository.findByCreatedBy(userId).stream()
                 .filter(s -> !"Y".equals(s.getDeletedYn())).toList();
-        List<ReputationScore> scores = items.isEmpty() ? List.of()
-                : scoreRepository.findByIdTargetTypeAndIdTargetIdIn("SKILL",
-                        items.stream().map(Skill::getId).toList());
+        List<McpMaster> mcpItems = mcpMasterRepository.findByCreatedBy(userId).stream()
+                .filter(m -> !"Y".equals(m.getDeletedYn())).toList();
+        int itemCount = skillItems.size() + mcpItems.size();
+        List<ReputationScore> scores = new ArrayList<>();
+        if (!skillItems.isEmpty()) {
+            scores.addAll(scoreRepository.findByIdTargetTypeAndIdTargetIdIn("SKILL",
+                    skillItems.stream().map(Skill::getId).toList()));
+        }
+        if (!mcpItems.isEmpty()) {
+            scores.addAll(scoreRepository.findByIdTargetTypeAndIdTargetIdIn("MCP",
+                    mcpItems.stream().map(McpMaster::getId).toList()));
+        }
         double avgScore = scores.stream()
                 .filter(s -> s.getScore() != null)
                 .mapToDouble(s -> s.getScore().doubleValue())
@@ -128,20 +209,20 @@ public class ReputationServiceImpl implements ReputationService {
         int fulfilled = 0;
 
         String tier = "NEW_MEMBER";
-        if (!items.isEmpty()) {
+        if (itemCount > 0) {
             tier = "VERIFIED";
         }
-        if (items.size() >= 3 && avgScore >= TRUSTED_THRESHOLD) {
+        if (itemCount >= 3 && avgScore >= TRUSTED_THRESHOLD) {
             tier = "TRUSTED_AUTHOR";
         }
-        if (items.size() >= 5 && avgScore >= POPULAR_THRESHOLD) {
+        if (itemCount >= 5 && avgScore >= POPULAR_THRESHOLD) {
             tier = "EXPERT";
         }
 
         ContributorReputation row = contributorRepository.findById(userId)
                 .orElse(ContributorReputation.builder().userId(userId).build());
         row.setTier(tier);
-        row.setItemCount(items.size());
+        row.setItemCount(itemCount);
         row.setAvgScore(scores.isEmpty() ? null
                 : BigDecimal.valueOf(avgScore).setScale(2, RoundingMode.HALF_UP));
         row.setFulfilledRequests(fulfilled);

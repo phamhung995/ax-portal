@@ -9,6 +9,9 @@ import PrismPagination from '@/design-system/components/PrismPagination.vue'
 import PrismTextarea from '@/design-system/components/PrismTextarea.vue'
 import PrismAlert from '@/design-system/components/PrismAlert.vue'
 import PrismTooltip from '@/design-system/components/PrismTooltip.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
+import { reputationApi } from '@/features/reputation/api'
+import type { ReputationExplain } from '@/features/reputation/api'
 import EditMcpPopup from './EditMcpPopup.vue'
 import UpdateVersionPopup from './UpdateVersionPopup.vue'
 import { mcpApi } from '@/features/mcp/api'
@@ -32,6 +35,7 @@ const avgRating = ref<number | null>(null)
 const totalRatings = ref(0)
 const myRating = ref<number | null>(null)
 const hoverRating = ref<number | null>(null)
+const reputation = ref<ReputationExplain | null>(null)
 
 const comments = ref<{ id: number; userId: number; userName: string | null; content: string; createdAt: string; canDelete: boolean }[]>([])
 const commentTotal = ref(0)
@@ -145,6 +149,16 @@ async function loadRating() {
   } catch {
     // non-fatal
   }
+  void loadReputation()
+}
+
+async function loadReputation() {
+  if (!props.mcpId) return
+  try {
+    reputation.value = await reputationApi.explain('MCP', props.mcpId)
+  } catch {
+    reputation.value = null
+  }
 }
 
 async function loadComments(resetPage = false) {
@@ -211,6 +225,7 @@ function openFor(mcpId: number) {
   totalRatings.value = 0
   myRating.value = null
   hoverRating.value = null
+  reputation.value = null
   comments.value = []
   commentTotal.value = 0
   commentPage.value = 1
@@ -615,6 +630,16 @@ async function toggleSubscribe() {
             <LinkIcon :size="14" aria-hidden="true" />
             {{ t('app.mcp.copyLink') }}
           </button>
+          <!-- Reputation badge: same row as the MCP name, right of Copy link
+               (same placement as SkillDetailPopup, 68e47e4). Tooltip on the
+               badge itself (in-dialog: the popup is a native <dialog> in the
+               top layer, so a body-teleported tooltip would paint behind it). -->
+          <PrismTooltip v-if="reputation" in-dialog>
+            <ReputationBadge :tier="reputation.tier" :score="reputation.score" />
+            <template #content>
+              <div v-for="reason in reputation.reasons" :key="reason">{{ reason }}</div>
+            </template>
+          </PrismTooltip>
         </div>
       </div>
 
