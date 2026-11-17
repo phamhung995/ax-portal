@@ -448,10 +448,12 @@ function buildBannerI18n() {
   const phrasePool: string[] = []
   for (const key of Object.keys(m)) {
     const match = /^home\.banner\.speech\.(.+)$/.exec(key)
-    if (!match) continue
+    if (!match || !match[1]) continue
     const value = m[key]
-    speech[match[1]] = value
-    if (value) phrasePool.push(value)
+    if (value) {
+      speech[match[1]] = value
+      phrasePool.push(value)
+    }
   }
   // Personalized greeting: substitute {name} with the logged-in user's
   // display name (Home SRS §5.3 greeting region uses the same source).
