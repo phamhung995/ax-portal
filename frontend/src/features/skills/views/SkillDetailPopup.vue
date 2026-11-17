@@ -818,6 +818,16 @@ async function toggleSubscribe() {
               <LinkIcon :size="14" aria-hidden="true" />
               {{ t('app.skill.copyLink') }}
             </button>
+            <!-- Reputation badge: same row as the skill name, right of Copy link.
+                 Tooltip on the badge itself (in-dialog: the popup is a native
+                 <dialog> in the top layer, so a body-teleported tooltip would
+                 paint behind it — see PrismTooltip `inDialog`). -->
+            <PrismTooltip v-if="reputation" in-dialog>
+              <ReputationBadge :tier="reputation.tier" :score="reputation.score" />
+              <template #content>
+                <div v-for="reason in reputation.reasons" :key="reason">{{ reason }}</div>
+              </template>
+            </PrismTooltip>
           </div>
         </div>
         <div class="dtl-header-strip">
@@ -845,12 +855,6 @@ async function toggleSubscribe() {
               ★ {{ avgRating.toFixed(1) }}/5 ({{ totalRatings }})
             </span>
             <span v-else class="dtl-norating">{{ t('app.common.noRating') }}</span>
-            <span v-if="reputation" class="dtl-reputation">
-              <ReputationBadge :tier="reputation.tier" :score="reputation.score" />
-              <PrismTooltip :content="reputation.reasons.join('\n')">
-                <span class="dtl-reputation-why">Vì sao?</span>
-              </PrismTooltip>
-            </span>
             <!-- Star rating (editable when APPROVED) -->
             <div class="dtl-rate" :class="{ 'is-disabled': !isApproved }">
               <button

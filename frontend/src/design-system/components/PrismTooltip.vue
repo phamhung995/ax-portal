@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, useId } from 'vue'
-const props = defineProps({ content: { type: String, default: '' }, placement: { type: String, default: 'top' }, delay: { type: Number, default: 120 }, disabled: Boolean })
+const props = defineProps({ content: { type: String, default: '' }, placement: { type: String, default: 'top' }, delay: { type: Number, default: 120 }, disabled: Boolean, inDialog: Boolean })
 const triggerRef = ref(null)
 const tipRef = ref(null)
 const visible = ref(false)
@@ -50,7 +50,7 @@ onBeforeUnmount(() => { clearTimeout(timer) })
 <template>
   <span class="p-tooltip" @mouseenter="show" @mouseleave="hide" @focusin="show" @focusout="hide">
     <span ref="triggerRef" @keydown="onKeydown"><slot /></span>
-    <Teleport to="body">
+    <Teleport to="body" :disabled="inDialog">
       <span v-if="visible && (content || $slots.default)" ref="tipRef" :id="id" role="tooltip" class="p-tooltip-bubble p-glass" :style="{ top: `${position.top}px`, left: `${position.left}px`, transform }">
         <slot name="content">{{ content }}</slot>
       </span>
