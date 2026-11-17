@@ -959,6 +959,10 @@ public class SkillServiceImpl implements SkillService {
                 .userId(user.getId())
                 .downloadAll(downloadAll)
                 .build());
+        // Reputation (BA §9.5): a new download is a signal too — refresh the
+        // cached score so popularity (download count) never goes stale until
+        // the next rating.
+        reputationService.refreshSkill(skillId);
     }
 
     // ------------------------------------------------------------------

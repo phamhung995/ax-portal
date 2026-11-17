@@ -102,7 +102,13 @@ public class ReputationServiceImpl implements ReputationService {
                 "ratingAvgRaw", avg != null ? avg.doubleValue() : 0.0,
                 "globalMean", m,
                 "downloads", downloads));
-        return scoreRepository.save(row);
+        ReputationScore saved = scoreRepository.save(row);
+        // Contributor tier derives from the author's item scores (BA §9.3),
+        // so a skill-score change refreshes the author too.
+        if (skill.getCreatedBy() != null) {
+            refreshContributor(skill.getCreatedBy());
+        }
+        return saved;
     }
 
     @Override
