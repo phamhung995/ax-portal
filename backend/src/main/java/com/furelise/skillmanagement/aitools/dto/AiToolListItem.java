@@ -20,6 +20,10 @@ public record AiToolListItem(
         String fileName,
         Long fileId,
         /** True when the viewer may edit/delete this tool (creator or admin). */
-        boolean canEdit
+        boolean canEdit,
+        /** Cached reputation score (0-100, null = not enough downloads yet). */
+        Double reputationScore,
+        /** Cached reputation tier (NEW | TRUSTED | POPULAR). */
+        String reputationTier
 ) {
 }

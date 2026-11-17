@@ -10,6 +10,9 @@ import PrismDrawer from '@/design-system/components/PrismDrawer.vue'
 import PrismEmptyState from '@/design-system/components/PrismEmptyState.vue'
 import PrismInput from '@/design-system/components/PrismInput.vue'
 import PrismSkeleton from '@/design-system/components/PrismSkeleton.vue'
+import PrismTooltip from '@/design-system/components/PrismTooltip.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
+import { reputationApi, type ReputationExplain } from '@/features/reputation/api'
 import AiNewsComments from '@/features/ai-news/components/AiNewsComments.vue'
 import AiNewsImportDialog from '@/features/ai-news/components/AiNewsImportDialog.vue'
 import { aiNewsApi, type AiNewsSearchFilters } from '@/features/ai-news/api'
@@ -82,16 +85,35 @@ function resetSearch() {
 
 const DOT_TONES = ['accent', 'violet', 'success', 'warning', 'teal', 'rose']
 
-// Grid sort mode (newest / most liked / most commented). Applied client-side
-// on the already-fetched items — no extra API call needed.
-const gridSort = ref<'newest' | 'likes' | 'comments'>('newest')
+// Grid sort mode (newest / most liked / most commented / most reputable).
+// Applied client-side on the already-fetched items — no extra API call needed.
+const gridSort = ref<'newest' | 'likes' | 'comments' | 'reputation'>('newest')
 const gridSortMenuOpen = ref(false)
+// 'Uy tín nhất' has no i18n key yet (same as the hardcoded badge labels) —
+// FR-8 translation keys are still pending for reputation strings.
+const gridSortLabel = computed(() =>
+  gridSort.value === 'newest'
+    ? t('aiNews.gridSortNewest')
+    : gridSort.value === 'likes'
+      ? t('aiNews.gridSortLikes')
+      : gridSort.value === 'comments'
+        ? t('aiNews.gridSortComments')
+        : 'Uy tín nhất',
+)
 const gridSortedItems = computed(() => {
   const arr = [...items.value]
   if (gridSort.value === 'likes') {
     arr.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || (b.newsId - a.newsId))
   } else if (gridSort.value === 'comments') {
     arr.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0) || (b.newsId - a.newsId))
+  } else if (gridSort.value === 'reputation') {
+    // Best score first; unscored items (null) last; tie-break newest first.
+    arr.sort(
+      (a, b) =>
+        (b.reputationScore ?? -1) - (a.reputationScore ?? -1) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+        b.newsId - a.newsId,
+    )
   } else {
     // 'newest' — sort by createdAt DESC (parse to epoch ms — lexicographic
     // ISO comparison is unreliable with variable fractional-second precision).
@@ -113,7 +135,13 @@ async function loadList() {
   listError.value = ''
   const reqId = ++listReqId
   try {
-    const data = await aiNewsApi.list(50, applied.value)
+    // When the reputation mode is active the API sorts by cached score too
+    // (within the fetched newest-50 window — see backend AiNewsServiceImpl).
+    const data = await aiNewsApi.list(
+      50,
+      applied.value,
+      gridSort.value === 'reputation' ? 'reputation' : undefined,
+    )
     if (reqId !== listReqId) return // superseded by a newer search
     items.value = data
     // FR-03: ?news={newsId} → select it (if in list); otherwise the first
@@ -127,6 +155,13 @@ async function loadList() {
       sorted.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || b.newsId - a.newsId)
     } else if (gridSort.value === 'comments') {
       sorted.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0) || b.newsId - a.newsId)
+    } else if (gridSort.value === 'reputation') {
+      sorted.sort(
+        (a, b) =>
+          (b.reputationScore ?? -1) - (a.reputationScore ?? -1) ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+          b.newsId - a.newsId,
+      )
     }
     selectedId.value = exists ? wanted : (sorted[0]?.newsId ?? null)
     syncHash()
@@ -193,12 +228,15 @@ let detailAbort: AbortController | null = null
 const detailLoading = ref(false)
 const detailState = ref<'idle' | 'loading' | 'error' | 'notfound' | 'empty' | 'ok'>('idle')
 const detail = ref<AiNewsDetail | null>(null)
+/** Reputation explain (badge + "why" reasons) for the selected item. */
+const reputation = ref<ReputationExplain | null>(null)
 
 async function loadDetail() {
   const id = selectedId.value
   if (id == null) {
     detailState.value = 'idle'
     detail.value = null
+    reputation.value = null
     return
   }
   detailAbort?.abort()
@@ -207,6 +245,7 @@ async function loadDetail() {
   detailLoading.value = true
   detailState.value = 'loading'
   detail.value = null
+  reputation.value = null
   try {
     // Fire detail + comments in parallel — they are independent endpoints
     // (comments does its own requireActiveNews). Saves one RTT on every
@@ -218,12 +257,23 @@ async function loadDetail() {
     if (controller.signal.aborted) return
     detail.value = data
     detailState.value = data.body ? 'ok' : 'empty'
+    void loadReputation(id)
   } catch (error) {
     if (controller.signal.aborted) return
     const code = (error as { code?: string })?.code
     detailState.value = code === 'NEWS_NOT_FOUND' ? 'notfound' : 'error'
   } finally {
     if (!controller.signal.aborted) detailLoading.value = false
+  }
+}
+
+async function loadReputation(id: number) {
+  try {
+    const explain = await reputationApi.explain('AI_NEWS', id)
+    // Only apply if the user is still on the same item.
+    if (selectedId.value === id) reputation.value = explain
+  } catch {
+    if (selectedId.value === id) reputation.value = null
   }
 }
 
@@ -451,6 +501,10 @@ onMounted(async () => {
   document.documentElement.classList.add('ainews-page')
   // View timer only accumulates while the tab is visible.
   document.addEventListener('visibilitychange', onViewVisibilityChange)
+  // Deep-link: ?sortBy=reputation sorts best-first (same as Skill/MCP).
+  if (route.query.sortBy === 'reputation') {
+    gridSort.value = 'reputation'
+  }
   await loadList()
   // loadDetail is triggered by the selectedId watcher when loadList sets
   // the initial selection — no explicit call needed (would double-fetch).
@@ -547,13 +601,14 @@ onBeforeUnmount(() => {
               :aria-expanded="gridSortMenuOpen"
               @click="gridSortMenuOpen = !gridSortMenuOpen"
             >
-              <span>{{ gridSort === 'newest' ? t('aiNews.gridSortNewest') : gridSort === 'likes' ? t('aiNews.gridSortLikes') : t('aiNews.gridSortComments') }}</span>
+              <span>{{ gridSortLabel }}</span>
               <ChevronDown :size="13" aria-hidden="true" />
             </button>
             <div v-if="gridSortMenuOpen" class="ainews-grid-sort-menu" @click.away="gridSortMenuOpen = false">
               <button type="button" :class="{ 'is-active': gridSort === 'newest' }" @click="gridSort = 'newest'; gridSortMenuOpen = false">{{ t('aiNews.gridSortNewest') }}</button>
               <button type="button" :class="{ 'is-active': gridSort === 'likes' }" @click="gridSort = 'likes'; gridSortMenuOpen = false">{{ t('aiNews.gridSortLikes') }}</button>
               <button type="button" :class="{ 'is-active': gridSort === 'comments' }" @click="gridSort = 'comments'; gridSortMenuOpen = false">{{ t('aiNews.gridSortComments') }}</button>
+              <button type="button" :class="{ 'is-active': gridSort === 'reputation' }" @click="gridSort = 'reputation'; gridSortMenuOpen = false">Uy tín nhất</button>
             </div>
           </div>
         </template>
@@ -606,6 +661,13 @@ onBeforeUnmount(() => {
                 <span v-if="item.commentCount > 0" class="ai-news-stat"><MessageCircle :size="11" aria-hidden="true" /> {{ item.commentCount }}</span>
                 <span v-if="item.viewCount > 0" class="ai-news-stat"><Eye :size="11" aria-hidden="true" /> {{ item.viewCount }}</span>
               </div>
+              <div class="ai-news-reputation">
+                <ReputationBadge
+                  :tier="item.reputationTier"
+                  :score="item.reputationScore"
+                  new-hint="Mới: chưa đủ lượt xem để xếp hạng (cần 5)"
+                />
+              </div>
             </div>
           </li>
         </ul>
@@ -635,6 +697,17 @@ onBeforeUnmount(() => {
             {{ headerMeta.sender }}
           </span>
           <span class="ainews-meta-right">
+            <!-- Reputation badge with explain tooltip (score from like/view + decay). -->
+            <PrismTooltip v-if="reputation">
+              <ReputationBadge
+                :tier="reputation.tier"
+                :score="reputation.score"
+                new-hint="Mới: chưa đủ lượt xem để xếp hạng (cần 5)"
+              />
+              <template #content>
+                <div v-for="reason in reputation.reasons" :key="reason">{{ reason }}</div>
+              </template>
+            </PrismTooltip>
             <span v-if="detail && detail.viewCount > 0" class="ainews-viewers" :title="t('aiNews.viewers', { n: detail.viewCount })">
               <Eye :size="13" aria-hidden="true" />
               {{ detail.viewCount }}

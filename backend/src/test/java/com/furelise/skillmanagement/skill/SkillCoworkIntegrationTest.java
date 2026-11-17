@@ -179,6 +179,16 @@ class SkillCoworkIntegrationTest {
             }
 
             @Override
+            public com.furelise.skillmanagement.reputation.model.ReputationScore refreshAiTool(Long toolId) {
+                return null;
+            }
+
+            @Override
+            public com.furelise.skillmanagement.reputation.model.ReputationScore refreshAiNews(Long newsId) {
+                return null;
+            }
+
+            @Override
             public void refreshContributor(Long userId) {
             }
 

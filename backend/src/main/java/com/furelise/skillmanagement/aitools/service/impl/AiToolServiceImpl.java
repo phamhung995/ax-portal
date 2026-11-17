@@ -22,6 +22,8 @@ import com.furelise.skillmanagement.aitools.service.AiToolFileStorageService;
 import com.furelise.skillmanagement.aitools.service.AiToolService;
 import com.furelise.skillmanagement.exception.BusinessErrorCode;
 import com.furelise.skillmanagement.exception.BusinessException;
+import com.furelise.skillmanagement.reputation.model.ReputationScore;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.skill.model.ProcessStage;
 import com.furelise.skillmanagement.skill.model.SkillCategory;
 import com.furelise.skillmanagement.skill.repository.ProcessStageRepository;
@@ -84,6 +86,7 @@ public class AiToolServiceImpl implements AiToolService {
     private final AiToolFileStorageService fileStorageService;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final ReputationService reputationService;
 
     // ------------------------------------------------------------------
     // Create: any authenticated user. Update / delete: uploader or admin
@@ -212,30 +215,44 @@ public class AiToolServiceImpl implements AiToolService {
             case "name" -> "name";
             case "uploader" -> "uploader";
             case "downloadcount" -> "downloadCount";
+            case "reputation" -> "reputation";
             default -> "createdAt";
         };
 
         Specification<AiTool> spec = searchCriteria(request, true);
 
         // "uploader" sorts by the uploader's user name (join), and
-        // "downloadCount" has no entity column (download log) — both are
-        // handled in memory, then paged manually (same approach as the
-        // Skill Management avgRating sort).
+        // "downloadCount" / "reputation" have no entity column (download log /
+        // cached reputation score) — all are handled in memory, then paged
+        // manually (same approach as the Skill Management avgRating sort).
         List<AiTool> tools;
         long total;
-        if ("uploader".equals(sortBy) || "downloadCount".equals(sortBy)) {
+        if ("uploader".equals(sortBy) || "downloadCount".equals(sortBy) || "reputation".equals(sortBy)) {
             List<AiTool> all = aiToolRepository.findAll(spec,
                     Sort.by(Sort.Direction.DESC, "createdAt"));
             Map<Long, User> uploaders = loadUploaders(all);
             Map<Long, Long> downloads = loadDownloadCounts(all);
-            Comparator<AiTool> bySort = "uploader".equals(sortBy)
-                    ? Comparator.comparing(t -> {
-                        User u = uploaders.get(t.getCreatedBy());
-                        return u != null && u.getName() != null ? u.getName() : "";
-                    })
-                    : Comparator.comparingLong(t -> downloads.getOrDefault(t.getId(), 0L));
-            if (direction == Sort.Direction.DESC) {
-                bySort = bySort.reversed();
+            Comparator<AiTool> bySort;
+            if ("reputation".equals(sortBy)) {
+                // Cached reputation_scores (null = not enough downloads yet,
+                // sorts last). Always best-first — the direction toggle does
+                // not apply to reputation (same as MCP).
+                Map<Long, ReputationScore> scores = reputationService.getReputations(
+                        "AI_TOOL", all.stream().map(AiTool::getId).toList());
+                bySort = Comparator.comparingDouble(
+                        (AiTool t) -> scores.get(t.getId()) != null
+                                && scores.get(t.getId()).getScore() != null
+                                ? scores.get(t.getId()).getScore().doubleValue() : -1.0).reversed();
+            } else {
+                bySort = "uploader".equals(sortBy)
+                        ? Comparator.comparing(t -> {
+                            User u = uploaders.get(t.getCreatedBy());
+                            return u != null && u.getName() != null ? u.getName() : "";
+                        })
+                        : Comparator.comparingLong(t -> downloads.getOrDefault(t.getId(), 0L));
+                if (direction == Sort.Direction.DESC) {
+                    bySort = bySort.reversed();
+                }
             }
             all.sort(bySort.thenComparing(AiTool::getCreatedAt,
                     direction == Sort.Direction.ASC ? Comparator.naturalOrder() : Comparator.reverseOrder())
@@ -258,6 +275,7 @@ public class AiToolServiceImpl implements AiToolService {
         Map<Long, List<String>> stagesByTool = loadStageNames(tools);
         Map<Long, Long> downloads = loadDownloadCounts(tools);
         Map<Long, AiToolFile> files = loadFiles(tools);
+        Map<Long, ReputationScore> reputations = loadReputations(tools);
 
         List<AiToolListItem> items = tools.stream().map(t -> {
             User uploader = uploaders.get(t.getCreatedBy());
@@ -273,7 +291,10 @@ public class AiToolServiceImpl implements AiToolService {
                     downloads.getOrDefault(t.getId(), 0L),
                     file != null ? file.getFileName() : null,
                     file != null ? file.getId() : null,
-                    t.getCreatedBy().equals(viewer.getId()) || isAdmin(viewer));
+                    t.getCreatedBy().equals(viewer.getId()) || isAdmin(viewer),
+                    reputations.get(t.getId()) != null && reputations.get(t.getId()).getScore() != null
+                            ? reputations.get(t.getId()).getScore().doubleValue() : null,
+                    reputations.get(t.getId()) != null ? reputations.get(t.getId()).getTier() : "NEW");
         }).toList();
 
         return new AiToolSearchResult(total, page, pageSize, items,
@@ -421,6 +442,9 @@ public class AiToolServiceImpl implements AiToolService {
                 .toolId(toolId)
                 .userId(user.getId())
                 .build());
+        // Reputation (BA §9.5): a new download is a signal too — refresh the
+        // cached score so popularity (download count) never goes stale.
+        reputationService.refreshAiTool(toolId);
         return new AiToolDownloadResult(file.getFileName(),
                 fileStorageService.load(file.getFilePath()));
     }
@@ -648,6 +672,14 @@ public class AiToolServiceImpl implements AiToolService {
         }
         return downloadLogRepository.findByToolIdIn(ids).stream()
                 .collect(Collectors.groupingBy(AiToolDownloadLog::getToolId, Collectors.counting()));
+    }
+
+    private Map<Long, ReputationScore> loadReputations(List<AiTool> tools) {
+        if (tools.isEmpty()) {
+            return Map.of();
+        }
+        return reputationService.getReputations("AI_TOOL",
+                tools.stream().map(AiTool::getId).toList());
     }
 
     /** One file (id + name) per tool id. */

@@ -5,6 +5,7 @@ import com.furelise.skillmanagement.ainews.repository.AiNewsRepository;
 import com.furelise.skillmanagement.ainews.repository.AiNewsViewLogRepository;
 import com.furelise.skillmanagement.exception.BusinessErrorCode;
 import com.furelise.skillmanagement.exception.BusinessException;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.user.model.User;
 import com.furelise.skillmanagement.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,7 @@ class AiNewsServiceImplViewTest {
     @Mock private AiNewsViewLogRepository viewLogRepository;
     @Mock private UserRepository userRepository;
     @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Mock private ReputationService reputationService;
 
     private AiNewsServiceImpl service;
 
@@ -54,7 +56,7 @@ class AiNewsServiceImplViewTest {
                 .thenReturn(status);
         service = new AiNewsServiceImpl(
                 aiNewsRepository, likeRepository, viewLogRepository,
-                userRepository, transactionManager);
+                userRepository, transactionManager, reputationService);
     }
 
     private User user() {

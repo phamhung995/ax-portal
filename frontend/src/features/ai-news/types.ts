@@ -11,6 +11,10 @@ export interface AiNewsItem {
   commentCount: number
   /** Distinct-viewer count (users who read this news for 30s+). */
   viewCount: number
+  /** Cached reputation score (0-100, null = not enough views yet). */
+  reputationScore: number | null
+  /** Cached reputation tier (NEW | TRUSTED | POPULAR). */
+  reputationTier: string
 }
 
 /** Detail — includes the sanitized HTML body. */

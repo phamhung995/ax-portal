@@ -17,6 +17,15 @@ public interface ReputationService {
     /** Minimum number of ratings before a score is shown (tier NEW below it). */
     int MIN_RATINGS = 5;
 
+    /** Minimum number of downloads before an AI Tool score is shown. */
+    int MIN_DOWNLOADS = 5;
+
+    /** Minimum number of distinct views before an AI News score is shown. */
+    int MIN_VIEWS = 5;
+
+    /** Half-life (days) of the AI News time decay (BA §9.1, Q4 defaults). */
+    int NEWS_HALF_LIFE_DAYS = 7;
+
     /** Bayesian prior weight (a "virtual" 10 ratings at the global mean). */
     int BAYESIAN_PRIOR = 10;
 
@@ -25,6 +34,18 @@ public interface ReputationService {
 
     /** Recompute and persist the score of one MCP (same formula as Skill, GĐ3). */
     ReputationScore refreshMcp(Long mcpId);
+
+    /**
+     * Recompute and persist the score of one AI Tool (GĐ4). Q1 (BA §14):
+     * tools have NO star ratings — the score is download popularity only.
+     */
+    ReputationScore refreshAiTool(Long toolId);
+
+    /**
+     * Recompute and persist the score of one AI News item (GĐ4): Wilson
+     * lower bound on the like/view ratio, decayed with a 7-day half-life.
+     */
+    ReputationScore refreshAiNews(Long newsId);
 
     /** Recompute and persist the contributor tier of one user. */
     void refreshContributor(Long userId);

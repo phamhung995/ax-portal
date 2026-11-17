@@ -9,7 +9,7 @@ import java.util.List;
  *
  * <p>categoryIds: the tool must have at least one of the given categories.
  * stageId: the tool must be mapped to that process stage (Process Map view).
- * sortBy: "name", "uploader" or "downloadCount" (default "createdDate").
+ * sortBy: "name", "uploader", "downloadCount" or "reputation" (default "createdDate").
  */
 public record AiToolSearchRequest(
         String name,

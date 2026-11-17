@@ -13,6 +13,10 @@ export interface AiToolListItem {
   fileId: number | null
   /** True when the current user may edit/delete this tool (creator or admin). */
   canEdit: boolean
+  /** Cached reputation score (0-100, null = not enough downloads yet). */
+  reputationScore: number | null
+  /** Cached reputation tier (NEW | TRUSTED | POPULAR). */
+  reputationTier: string
 }
 
 export interface AiToolSearchResult {

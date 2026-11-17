@@ -37,6 +37,16 @@ public interface AiNewsCommentVoteRepository extends JpaRepository<AiNewsComment
     long countByCommentId(Long commentId);
 
     /**
+     * Total "helpful" votes on all (non-deleted) comments of one news item.
+     * Used only for the reputation explain breakdown — comment votes do NOT
+     * enter the news score (GĐ4).
+     */
+    @Query(value = "SELECT COUNT(*) FROM ai_news_comment_vote v "
+            + "JOIN ai_news_comment c ON c.comment_id = v.comment_id "
+            + "WHERE c.news_id = :newsId AND c.deleted_at IS NULL", nativeQuery = true)
+    long countVotesByNewsId(@Param("newsId") Long newsId);
+
+    /**
      * Single IN-clause fetch of the viewer's votes for a set of comments.
      * Replaces {@code findAllById} (one SELECT per comment — N+1) in the
      * AI News comment list.

@@ -12,6 +12,8 @@ import com.furelise.skillmanagement.ainews.repository.AiNewsViewLogRepository;
 import com.furelise.skillmanagement.ainews.service.AiNewsService;
 import com.furelise.skillmanagement.exception.BusinessErrorCode;
 import com.furelise.skillmanagement.exception.BusinessException;
+import com.furelise.skillmanagement.reputation.model.ReputationScore;
+import com.furelise.skillmanagement.reputation.service.ReputationService;
 import com.furelise.skillmanagement.user.model.User;
 import com.furelise.skillmanagement.user.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +27,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * AI News screen + Home card data (AI_News_Screen_SRS.md §5) — news content
@@ -50,6 +54,7 @@ public class AiNewsServiceImpl implements AiNewsService {
     private final AiNewsLikeRepository likeRepository;
     private final AiNewsViewLogRepository viewLogRepository;
     private final UserRepository userRepository;
+    private final ReputationService reputationService;
 
     /**
      * Runs the view-log upsert in its OWN transaction (PROPAGATION_REQUIRES_NEW).
@@ -65,11 +70,13 @@ public class AiNewsServiceImpl implements AiNewsService {
                              AiNewsLikeRepository likeRepository,
                              AiNewsViewLogRepository viewLogRepository,
                              UserRepository userRepository,
-                             PlatformTransactionManager transactionManager) {
+                             PlatformTransactionManager transactionManager,
+                             ReputationService reputationService) {
         this.aiNewsRepository = aiNewsRepository;
         this.likeRepository = likeRepository;
         this.viewLogRepository = viewLogRepository;
         this.userRepository = userRepository;
+        this.reputationService = reputationService;
         this.viewTransaction = new TransactionTemplate(transactionManager);
         this.viewTransaction.setPropagationBehavior(
                 org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -78,10 +85,10 @@ public class AiNewsServiceImpl implements AiNewsService {
     @Override
     @Transactional(readOnly = true)
     public List<AiNewsItem> list(int limit) {
-        return aiNewsRepository.findActiveList(limit).stream()
-                .map(row -> new AiNewsItem(
-                        row.newsId(), row.title(), row.sender(), row.source(), row.createdAt(),
-                        row.likeCount(), row.commentCount(), row.viewCount()))
+        List<AiNewsRepository.AiNewsListItem> rows = aiNewsRepository.findActiveList(limit);
+        Map<Long, ReputationScore> reputations = loadReputations(rows);
+        return rows.stream()
+                .map(row -> toItem(row, reputations))
                 .toList();
     }
 
@@ -103,16 +110,49 @@ public class AiNewsServiceImpl implements AiNewsService {
                 : criteria.from().atStartOfDay(DISPLAY_ZONE).toInstant();
         Instant to = criteria.to() == null ? null
                 : criteria.to().plusDays(1).atStartOfDay(DISPLAY_ZONE).toInstant();
-        return aiNewsRepository.findActiveListFiltered(
+        List<AiNewsRepository.AiNewsListItem> rows = aiNewsRepository.findActiveListFiltered(
                         escapeLike(blankToNull(criteria.title())),
                         blankToNull(criteria.source()),
                         escapeLike(blankToNull(criteria.sender())),
-                        from, to, limit)
-                .stream()
-                .map(row -> new AiNewsItem(
-                        row.newsId(), row.title(), row.sender(), row.source(), row.createdAt(),
-                        row.likeCount(), row.commentCount(), row.viewCount()))
+                        from, to, limit);
+        Map<Long, ReputationScore> reputations = loadReputations(rows);
+        List<AiNewsItem> items = rows.stream()
+                .map(row -> toItem(row, reputations))
                 .toList();
+        if ("reputation".equalsIgnoreCase(criteria.sortBy())) {
+            // Reputation sort is best-first by cached score (null = not
+            // enough views yet, sorts last), tie-break newest first.
+            // NOTE: the native query already LIMITs to the newest `limit`
+            // rows, so this sort applies within that window — the news
+            // screen has no pagination, and the window is exactly what it
+            // displays (max 50).
+            return items.stream()
+                    .sorted(Comparator.comparingDouble(
+                                    (AiNewsItem item) -> item.reputationScore() != null
+                                            ? item.reputationScore() : -1.0).reversed()
+                            .thenComparing(AiNewsItem::createdAt, Comparator.reverseOrder())
+                            .thenComparing(AiNewsItem::newsId, Comparator.reverseOrder()))
+                    .toList();
+        }
+        return items;
+    }
+
+    private AiNewsItem toItem(AiNewsRepository.AiNewsListItem row,
+                              Map<Long, ReputationScore> reputations) {
+        ReputationScore rep = reputations.get(row.newsId());
+        return new AiNewsItem(
+                row.newsId(), row.title(), row.sender(), row.source(), row.createdAt(),
+                row.likeCount(), row.commentCount(), row.viewCount(),
+                rep != null && rep.getScore() != null ? rep.getScore().doubleValue() : null,
+                rep != null ? rep.getTier() : "NEW");
+    }
+
+    private Map<Long, ReputationScore> loadReputations(List<AiNewsRepository.AiNewsListItem> rows) {
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        return reputationService.getReputations("AI_NEWS",
+                rows.stream().map(AiNewsRepository.AiNewsListItem::newsId).toList());
     }
 
     private static String blankToNull(String value) {
@@ -185,6 +225,9 @@ public class AiNewsServiceImpl implements AiNewsService {
             firstTime = false;
         }
         if (firstTime) {
+            // Reputation (BA §9.5): a first-time view moves the news score.
+            // (Repeat views do not change any signal — no refresh needed.)
+            reputationService.refreshAiNews(newsId);
             // Authoritative count from the log (the recompute wrote the
             // same value, but the log is the source of truth).
             return (int) viewLogRepository.countByNewsId(newsId);
@@ -205,6 +248,8 @@ public class AiNewsServiceImpl implements AiNewsService {
         if (likeRepository.deleteLike(newsId, viewer.getId()) == 0) {
             likeRepository.upsertLike(newsId, viewer.getId());
         }
+        // Reputation (BA §9.5): a like/unlike moves the news score.
+        reputationService.refreshAiNews(newsId);
         return (int) likeRepository.countByNewsIdNative(newsId);
     }
 

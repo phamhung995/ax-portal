@@ -16,6 +16,8 @@ public record AiNewsSearchCriteria(
         String source,
         String sender,
         LocalDate from,
-        LocalDate to
+        LocalDate to,
+        /** "reputation" sorts by cached reputation score (best first); anything else = newest first. */
+        String sortBy
 ) {
 }

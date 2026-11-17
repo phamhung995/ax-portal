@@ -1,5 +1,13 @@
 package com.furelise.skillmanagement.reputation.service.impl;
 
+import com.furelise.skillmanagement.ainews.model.AiNews;
+import com.furelise.skillmanagement.ainews.repository.AiNewsCommentVoteRepository;
+import com.furelise.skillmanagement.ainews.repository.AiNewsLikeRepository;
+import com.furelise.skillmanagement.ainews.repository.AiNewsRepository;
+import com.furelise.skillmanagement.ainews.repository.AiNewsViewLogRepository;
+import com.furelise.skillmanagement.aitools.model.AiTool;
+import com.furelise.skillmanagement.aitools.repository.AiToolDownloadLogRepository;
+import com.furelise.skillmanagement.aitools.repository.AiToolRepository;
 import com.furelise.skillmanagement.mcp.model.McpMaster;
 import com.furelise.skillmanagement.mcp.repository.McpDownloadLogRepository;
 import com.furelise.skillmanagement.mcp.repository.McpMasterRepository;
@@ -22,9 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -52,6 +62,12 @@ public class ReputationServiceImpl implements ReputationService {
     private final McpRatingRepository mcpRatingRepository;
     private final McpDownloadLogRepository mcpDownloadLogRepository;
     private final McpMasterRepository mcpMasterRepository;
+    private final AiToolRepository aiToolRepository;
+    private final AiToolDownloadLogRepository aiToolDownloadLogRepository;
+    private final AiNewsRepository aiNewsRepository;
+    private final AiNewsLikeRepository aiNewsLikeRepository;
+    private final AiNewsViewLogRepository aiNewsViewLogRepository;
+    private final AiNewsCommentVoteRepository aiNewsCommentVoteRepository;
 
     @Override
     @Transactional
@@ -183,6 +199,133 @@ public class ReputationServiceImpl implements ReputationService {
 
     @Override
     @Transactional
+    public ReputationScore refreshAiTool(Long toolId) {
+        AiTool tool = aiToolRepository.findById(toolId).orElse(null);
+        if (tool == null || AiTool.DELETED.equals(tool.getDeletedYn())) {
+            return null;
+        }
+        // Q1 (BA §14, chốt 17/11): AI Tools have NO star ratings — the score
+        // is download popularity only:
+        //   popularity = min(log10(downloads + 1) / 2, 1)
+        //   score      = popularity * 100
+        // Q2 in spirit: the uploader's own downloads do not count.
+        // Worked examples: 5 downloads → 38.91 (NEW, below 70);
+        // 25 downloads → 70.75 (TRUSTED); 50 downloads → 85.38 (POPULAR).
+        long downloads = tool.getCreatedBy() == null
+                ? aiToolDownloadLogRepository.countByToolId(toolId)
+                : aiToolDownloadLogRepository.countByToolIdAndUserIdNot(toolId, tool.getCreatedBy());
+
+        BigDecimal score = null;
+        String tier = "NEW";
+        if (downloads >= MIN_DOWNLOADS) {
+            double popularity = Math.min(Math.log10(downloads + 1) / 2.0, 1.0);
+            double scoreValue = popularity * 100.0;
+            score = BigDecimal.valueOf(scoreValue).setScale(2, RoundingMode.HALF_UP);
+            if (scoreValue >= POPULAR_THRESHOLD && downloads >= POPULAR_MIN_DOWNLOADS) {
+                tier = "POPULAR";
+            } else if (scoreValue >= TRUSTED_THRESHOLD) {
+                tier = "TRUSTED";
+            }
+            // downloads >= 5 but score < 70: tier stays NEW and the (non-null)
+            // score is shown, so the user sees "not trusted yet".
+        }
+
+        ReputationScore row = scoreRepository.findById(new ReputationScoreId("AI_TOOL", toolId))
+                .orElse(ReputationScore.builder()
+                        .id(new ReputationScoreId("AI_TOOL", toolId)).build());
+        row.setScore(score);
+        row.setTier(tier);
+        row.setRatingCount(0);
+        row.setRatingAvg(null);
+        row.setDownloadCount((int) downloads);
+        row.setSuccessRate(null);
+        row.setUpdatedAt(Instant.now());
+        row.setSignals(Map.of("downloads", downloads));
+        // No contributor refresh: tool authors are counted via their
+        // Skill + MCP items (BA §9.3); tools carry no author reputation.
+        return scoreRepository.save(row);
+    }
+
+    @Override
+    @Transactional
+    public ReputationScore refreshAiNews(Long newsId) {
+        AiNews news = aiNewsRepository.findById(newsId).orElse(null);
+        if (news == null || "Y".equals(news.getArchiveYn())) {
+            return null;
+        }
+        // AI News is batch-imported from email — it has no author user, so
+        // there is no self-like / self-view to exclude (unlike Q2 for
+        // Skill/MCP). Likes and views are both per-user unique
+        // (ai_news_like PK, ai_news_view_log unique), so the ratio is a
+        // like rate over distinct viewers.
+        long likes = aiNewsLikeRepository.countByNewsIdNative(newsId);
+        long views = aiNewsViewLogRepository.countByNewsId(newsId);
+        long commentVotes = aiNewsCommentVoteRepository.countVotesByNewsId(newsId);
+        long ageDays = Math.max(0, Duration.between(news.getCreatedAt(), Instant.now()).toDays());
+        double wilson = wilsonLowerBound(likes, views);
+        // score = wilson * 100 * 0.5^(ageDays / 7) — 7-day half-life (BA §9.1,
+        // Q4 defaults). Comment votes enter the explain breakdown only,
+        // NOT the score.
+        // Worked examples (age 0): 10 likes / 10 views → 72.25 (TRUSTED);
+        // 5/5 → 56.55 (NEW, below 70); 20/20 → 83.89 (TRUSTED);
+        // 30/30 → 88.65 (POPULAR); same 10/10 at age 7d → 36.12 (NEW).
+        BigDecimal score = null;
+        String tier = "NEW";
+        if (views >= MIN_VIEWS) {
+            double decayed = wilson * 100.0 * Math.pow(0.5, ageDays / (double) NEWS_HALF_LIFE_DAYS);
+            score = BigDecimal.valueOf(decayed).setScale(2, RoundingMode.HALF_UP);
+            if (decayed >= POPULAR_THRESHOLD) {
+                tier = "POPULAR";
+            } else if (decayed >= TRUSTED_THRESHOLD) {
+                tier = "TRUSTED";
+            }
+            // views >= 5 but score < 70: tier stays NEW and the (non-null)
+            // score is shown.
+        }
+
+        ReputationScore row = scoreRepository.findById(new ReputationScoreId("AI_NEWS", newsId))
+                .orElse(ReputationScore.builder()
+                        .id(new ReputationScoreId("AI_NEWS", newsId)).build());
+        row.setScore(score);
+        row.setTier(tier);
+        // Column mapping for news (no stars, no downloads): ratingCount holds
+        // the like count, downloadCount holds the distinct-viewer count, and
+        // successRate holds the Wilson like/view lower bound (a rate, like
+        // the install success rate it was designed for).
+        row.setRatingCount((int) likes);
+        row.setRatingAvg(null);
+        row.setDownloadCount((int) views);
+        row.setSuccessRate(BigDecimal.valueOf(wilson).setScale(4, RoundingMode.HALF_UP));
+        row.setUpdatedAt(Instant.now());
+        row.setSignals(Map.of(
+                "likes", likes,
+                "views", views,
+                "commentVotes", commentVotes,
+                "ageDays", ageDays,
+                "wilson", wilson));
+        // No contributor refresh: news items have no author user.
+        return scoreRepository.save(row);
+    }
+
+    /**
+     * Wilson score lower bound (z = 1.96, 95%) for k successes out of n
+     * trials — the small-sample-safe rate used for AI News like/view
+     * (BA §9.1: "Wilson for rates"). 0 when there are no trials.
+     */
+    private static double wilsonLowerBound(long successes, long trials) {
+        if (trials <= 0) {
+            return 0.0;
+        }
+        double z = 1.96;
+        double p = (double) successes / trials;
+        double denom = 1.0 + z * z / trials;
+        double centre = p + z * z / (2.0 * trials);
+        double margin = z * Math.sqrt((p * (1.0 - p) + z * z / (4.0 * trials)) / trials);
+        return Math.max(0.0, (centre - margin) / denom);
+    }
+
+    @Override
+    @Transactional
     public void refreshContributor(Long userId) {
         // Contributor tier derives from ALL of the author's items (BA §9.3):
         // Skills (GĐ2) + MCPs (GĐ3). Each module contributes its own cached scores.
@@ -255,9 +398,27 @@ public class ReputationServiceImpl implements ReputationService {
     @Override
     @Transactional(readOnly = true)
     public ReputationExplainResponse explain(String targetType, Long targetId) {
+        String type = targetType.toUpperCase();
         ReputationScore row = scoreRepository.findById(
-                new ReputationScoreId(targetType.toUpperCase(), targetId)).orElse(null);
+                new ReputationScoreId(type, targetId)).orElse(null);
         List<String> reasons = new ArrayList<>();
+        switch (type) {
+            case "AI_TOOL" -> explainAiTool(row, reasons);
+            case "AI_NEWS" -> explainAiNews(row, reasons);
+            default -> explainRated(row, reasons);
+        }
+        BigDecimal score = row == null ? null : row.getScore();
+        String tier = row == null ? "NEW" : row.getTier();
+        return new ReputationExplainResponse(type, targetId, score, tier, reasons);
+    }
+
+    /**
+     * Reasons for a star-rated item (Skill / MCP). Part C fix (GĐ4): the
+     * "most used" reason now keys off tier == POPULAR, not score ≥ 85 —
+     * a TRUSTED item at 86 points with fewer than 20 downloads previously
+     * claimed to be "most used".
+     */
+    private void explainRated(ReputationScore row, List<String> reasons) {
         if (row == null || row.getRatingCount() < MIN_RATINGS) {
             int have = row == null ? 0 : row.getRatingCount();
             reasons.add("Mới: cần thêm " + (MIN_RATINGS - have)
@@ -266,17 +427,63 @@ public class ReputationServiceImpl implements ReputationService {
             reasons.add("Điểm Bayesian " + row.getRatingAvg() + "/5 từ "
                     + row.getRatingCount() + " lượt đánh giá.");
             reasons.add(row.getDownloadCount() + " lượt tải.");
-            if (row.getScore() != null && row.getScore().doubleValue() >= POPULAR_THRESHOLD) {
-                reasons.add("Thuộc nhóm được dùng nhiều nhất (≥" + POPULAR_THRESHOLD + " điểm).");
-            } else if (row.getScore() != null && row.getScore().doubleValue() >= TRUSTED_THRESHOLD) {
-                reasons.add("Đạt ngưỡng Đáng tin (≥" + (int) TRUSTED_THRESHOLD + " điểm).");
-            } else {
-                reasons.add("Điểm chưa đạt ngưỡng Đáng tin (" + (int) TRUSTED_THRESHOLD + ").");
-            }
+            addTierReason(row, reasons);
         }
-        BigDecimal score = row == null ? null : row.getScore();
-        String tier = row == null ? "NEW" : row.getTier();
-        return new ReputationExplainResponse(targetType.toUpperCase(), targetId, score, tier, reasons);
+    }
+
+    /** Reasons for an AI Tool: no stars (Q1) — the score is download-based. */
+    private void explainAiTool(ReputationScore row, List<String> reasons) {
+        int downloads = row == null ? 0 : row.getDownloadCount();
+        if (row == null || downloads < MIN_DOWNLOADS) {
+            reasons.add("Mới: cần thêm " + (MIN_DOWNLOADS - downloads)
+                    + " lượt tải nữa để có hạng (hiện có " + downloads + "/" + MIN_DOWNLOADS + ").");
+            reasons.add("Tool không có đánh giá sao — điểm uy tín tính từ lượt tải.");
+        } else {
+            reasons.add(downloads + " lượt tải — điểm uy tín tính từ lượt tải (tool không có đánh giá sao).");
+            addTierReason(row, reasons);
+        }
+    }
+
+    /** Reasons for an AI News item: like/view ratio (Wilson) + time decay. */
+    private void explainAiNews(ReputationScore row, List<String> reasons) {
+        int likes = row == null ? 0 : row.getRatingCount();
+        int views = row == null ? 0 : row.getDownloadCount();
+        if (row == null || views < MIN_VIEWS) {
+            reasons.add("Mới: cần thêm " + (MIN_VIEWS - views)
+                    + " lượt xem nữa để có hạng (hiện có " + views + "/" + MIN_VIEWS + ").");
+        } else {
+            double ratio = views > 0 ? 100.0 * likes / views : 0.0;
+            reasons.add(likes + " lượt thích trên " + views + " lượt xem (tỉ lệ thích "
+                    + String.format(Locale.ROOT, "%.0f", ratio) + "%).");
+            long commentVotes = signalLong(row, "commentVotes");
+            if (commentVotes > 0) {
+                reasons.add(commentVotes + " lượt bình chọn hữu ích cho bình luận.");
+            }
+            long ageDays = signalLong(row, "ageDays");
+            if (ageDays >= NEWS_HALF_LIFE_DAYS) {
+                reasons.add("Tin đăng cách đây " + ageDays + " ngày — điểm giảm dần theo thời gian.");
+            }
+            addTierReason(row, reasons);
+        }
+    }
+
+    /** Shared tier verdict line, keyed off the stored tier (never the raw score). */
+    private void addTierReason(ReputationScore row, List<String> reasons) {
+        if ("POPULAR".equals(row.getTier())) {
+            reasons.add("Thuộc nhóm được dùng nhiều nhất (≥" + POPULAR_THRESHOLD + " điểm).");
+        } else if ("TRUSTED".equals(row.getTier())) {
+            reasons.add("Đạt ngưỡng Đáng tin (≥" + (int) TRUSTED_THRESHOLD + " điểm).");
+        } else {
+            reasons.add("Điểm chưa đạt ngưỡng Đáng tin (" + (int) TRUSTED_THRESHOLD + ").");
+        }
+    }
+
+    private static long signalLong(ReputationScore row, String key) {
+        if (row == null || row.getSignals() == null) {
+            return 0;
+        }
+        Object value = row.getSignals().get(key);
+        return value instanceof Number number ? number.longValue() : 0;
     }
 
     private ReputationResponse toResponse(ReputationScore row) {

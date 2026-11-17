@@ -14,6 +14,10 @@ public record AiNewsItem(
         Instant createdAt,
         Long likeCount,
         Long commentCount,
-        Integer viewCount
+        Integer viewCount,
+        /** Cached reputation score (0-100, null = not enough views yet). */
+        Double reputationScore,
+        /** Cached reputation tier (NEW | TRUSTED | POPULAR). */
+        String reputationTier
 ) {
 }

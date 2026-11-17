@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Download, LayoutGrid, Plus, Search, X, GitBranch } from 'lucide-vue-next'
 import PrismButton from '@/design-system/components/PrismButton.vue'
 import PrismInput from '@/design-system/components/PrismInput.vue'
@@ -10,6 +11,7 @@ import PrismPagination from '@/design-system/components/PrismPagination.vue'
 import PrismEmptyState from '@/design-system/components/PrismEmptyState.vue'
 import PrismDialog from '@/design-system/components/PrismDialog.vue'
 import BadgeStack from '@/features/skills/views/BadgeStack.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
 import SearchUserPopup from '@/features/skills/views/SearchUserPopup.vue'
 import AiToolFormPopup from './AiToolFormPopup.vue'
 import AiToolDetailPopup from './AiToolDetailPopup.vue'
@@ -26,6 +28,7 @@ import type { AiToolListItem } from '@/features/ai-tools/types'
 const list = useAiToolListStore()
 const s = list.state
 const auth = useAuthStore()
+const route = useRoute()
 const { t, formatDate } = useI18nStore()
 
 const PAGE_SIZES = [10, 20, 50, 100]
@@ -190,7 +193,7 @@ function onPageSize(size: number) {
 }
 
 // ── Sorting (clickable headers) ────────────────────────────────────────────
-function onSort(field: 'name' | 'uploader' | 'createdAt' | 'downloadCount') {
+function onSort(field: 'name' | 'uploader' | 'createdAt' | 'downloadCount' | 'reputation') {
   if (s.sortBy === field) {
     s.sortDirection = s.sortDirection === 'ASC' ? 'DESC' : 'ASC'
   } else {
@@ -306,11 +309,21 @@ const columns = computed(() => [
   { key: 'uploaderName', label: t('app.aiTools.uploader') },
   { key: 'createdAt', label: t('app.users.colCreatedDate') },
   { key: 'downloadCount', label: t('app.aiTools.colDownloads') },
+  // 'Uy tín' has no i18n key yet (same as the hardcoded badge labels) —
+  // FR-8 translation keys are still pending for reputation strings.
+  { key: 'reputation', label: 'Uy tín' },
   { key: 'download', label: t('app.common.download') },
 ])
 
 onMounted(() => {
   loadTaxonomy()
+  // Deep-link: ?sortBy=reputation sorts best-first (same as Skill/MCP).
+  if (route.query.sortBy === 'reputation') {
+    s.sortBy = 'reputation'
+    s.sortDirection = 'DESC'
+    runSearch(true)
+    return
+  }
   // Results cached from a different user (e.g. after logout + login as
   // another account) are not valid — clear and re-run the search.
   if (s.hasSearched && s.searchedBy !== auth.user?.userId) {
@@ -486,6 +499,9 @@ onMounted(() => {
           <template #header-downloadCount>
             <span class="sortable" :class="sortClass('downloadCount')" @click="onSort('downloadCount')">{{ t('app.aiTools.colDownloads') }} <span class="sort-ind" aria-hidden="true"></span></span>
           </template>
+          <template #header-reputation>
+            <span class="sortable" :class="sortClass('reputation')" @click="onSort('reputation')">Uy tín <span class="sort-ind" aria-hidden="true"></span></span>
+          </template>
           <template #cell-name="{ row }">
             <button
               type="button"
@@ -521,6 +537,13 @@ onMounted(() => {
           </template>
           <template #cell-downloadCount="{ row }">
             {{ (row as AiToolListItem).downloadCount }}
+          </template>
+          <template #cell-reputation="{ row }">
+            <ReputationBadge
+              :tier="(row as AiToolListItem).reputationTier"
+              :score="(row as AiToolListItem).reputationScore"
+              new-hint="Mới: chưa đủ lượt tải để xếp hạng (cần 5)"
+            />
           </template>
           <template #cell-download="{ row }">
             <PrismButton
@@ -592,6 +615,11 @@ onMounted(() => {
               <span>{{ item.uploaderName ?? '—' }}</span>
               <span aria-hidden="true">·</span>
               <span>{{ t('app.common.downloads', { n: item.downloadCount }) }}</span>
+              <ReputationBadge
+                :tier="item.reputationTier"
+                :score="item.reputationScore"
+                new-hint="Mới: chưa đủ lượt tải để xếp hạng (cần 5)"
+              />
             </div>
           </div>
         </div>

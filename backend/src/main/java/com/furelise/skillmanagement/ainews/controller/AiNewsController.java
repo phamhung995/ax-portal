@@ -51,16 +51,18 @@ public class AiNewsController {
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String sender,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String sortBy) {
         // Clamp: limit <= 0 is invalid in PostgreSQL (LIMIT -1 = no limit) and
         // huge values are a DoS/over-fetch vector.
         int safeLimit = Math.min(Math.max(limit, 1), 50);
         // No filter params → identical behavior to the plain limit-only list.
-        if (title == null && source == null && sender == null && from == null && to == null) {
+        if (title == null && source == null && sender == null && from == null && to == null
+                && sortBy == null) {
             return ResponseEntity.ok(ApiResponse.ok(aiNewsService.list(safeLimit)));
         }
         return ResponseEntity.ok(ApiResponse.ok(aiNewsService.search(
-                new AiNewsSearchCriteria(title, source, sender, from, to), safeLimit)));
+                new AiNewsSearchCriteria(title, source, sender, from, to, sortBy), safeLimit)));
     }
 
     /** @mention autocomplete (authenticated, non-admin). */

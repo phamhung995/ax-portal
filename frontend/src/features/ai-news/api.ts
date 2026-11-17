@@ -17,10 +17,11 @@ export interface AiNewsSearchFilters {
  * All under /api/v1/home/ai-news.
  */
 export const aiNewsApi = {
-  list: (limit = 8, filters?: AiNewsSearchFilters) =>
+  list: (limit = 8, filters?: AiNewsSearchFilters, sortBy?: string) =>
     request<AiNewsItem[]>(api.get('/home/ai-news', {
       params: {
         limit,
+        ...(sortBy ? { sortBy } : {}),
         ...(filters?.title ? { title: filters.title } : {}),
         ...(filters?.source ? { source: filters.source } : {}),
         ...(filters?.sender ? { sender: filters.sender } : {}),

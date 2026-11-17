@@ -2,7 +2,10 @@
 import { computed, ref, watch } from 'vue'
 import PrismDialog from '@/design-system/components/PrismDialog.vue'
 import PrismButton from '@/design-system/components/PrismButton.vue'
+import PrismTooltip from '@/design-system/components/PrismTooltip.vue'
+import ReputationBadge from '@/features/skills/components/ReputationBadge.vue'
 import { aiToolApi } from '@/features/ai-tools/api'
+import { reputationApi, type ReputationExplain } from '@/features/reputation/api'
 import { toUserError } from '@/lib/api'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -18,6 +21,8 @@ const loading = ref(false)
 const downloading = ref(false)
 const deleteConfirm = ref(false)
 const deleting = ref(false)
+/** Reputation explain (badge + "why" reasons) — loaded with the detail. */
+const reputation = ref<ReputationExplain | null>(null)
 
 /** The uploader (creator) or an admin may edit/delete this tool. */
 const canEdit = computed(() => detail.value?.canEdit ?? false)
@@ -31,13 +36,24 @@ async function loadDetail() {
   if (!props.toolId) return
   loading.value = true
   detail.value = null
+  reputation.value = null
   try {
     detail.value = await aiToolApi.detail(props.toolId)
+    void loadReputation()
   } catch (err) {
     toastError(toUserError(err).message)
     close()
   } finally {
     loading.value = false
+  }
+}
+
+async function loadReputation() {
+  if (!props.toolId) return
+  try {
+    reputation.value = await reputationApi.explain('AI_TOOL', props.toolId)
+  } catch {
+    reputation.value = null
   }
 }
 
@@ -96,10 +112,21 @@ async function confirmDelete() {
 <template>
   <PrismDialog :model-value="toolId !== null" :title="t('app.aiTools.detailTitle')" size="lg" dialog-class="ai-tool-form-dialog" @update:model-value="!$event && close()">
     <div v-if="detail" class="dtl">
-      <!-- Row 1: Uploader + Created Date -->
+      <!-- Row 1: Uploader + Created Date + Reputation -->
       <div class="dtl-meta">
         <span>{{ t('app.aiTools.uploaderMeta', { name: detail.uploaderName ?? '—' }) }}</span>
         <span>{{ t('app.common.created', { date: formatDate(detail.createdAt) }) }}</span>
+        <!-- Reputation badge with explain tooltip (score is download-based, Q1). -->
+        <PrismTooltip v-if="reputation">
+          <ReputationBadge
+            :tier="reputation.tier"
+            :score="reputation.score"
+            new-hint="Mới: chưa đủ lượt tải để xếp hạng (cần 5)"
+          />
+          <template #content>
+            <div v-for="reason in reputation.reasons" :key="reason">{{ reason }}</div>
+          </template>
+        </PrismTooltip>
       </div>
 
       <!-- Row 2: Category -->
