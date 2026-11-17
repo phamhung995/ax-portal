@@ -38,6 +38,7 @@ class SkillRatingServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private EventNotificationService eventNotificationService;
+    @Mock private com.furelise.skillmanagement.reputation.service.ReputationService reputationService;
 
     @InjectMocks private SkillRatingServiceImpl ratingService;
 

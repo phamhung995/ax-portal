@@ -74,6 +74,7 @@ class SkillServiceTest {
     @Mock private com.furelise.skillmanagement.notification.service.EventNotificationService eventNotificationService;
     @Mock private com.furelise.skillmanagement.audit.service.AuditService auditService;
     @Mock private com.furelise.skillmanagement.skill.service.SkillWorkflowService skillWorkflowService;
+    @Mock private com.furelise.skillmanagement.reputation.service.ReputationService reputationService;
     @Mock private com.furelise.skillmanagement.skill.service.SkillVersionUpdateService skillVersionUpdateService;
     @Mock private com.furelise.skillmanagement.mcp.service.McpDependencyService mcpDependencyService;
     @Mock private com.furelise.skillmanagement.skill.repository.SkillVersionRepository skillVersionRepository;

@@ -165,6 +165,36 @@ class SkillCoworkIntegrationTest {
         McpDependencyService mcpDependencyService = new McpDependencyService(
                 skillMcpDependencyRepository, mcpMasterRepository, mcpFileRepository,
                 mcpVersionRepository, mcpVersionFileRepository);
+        // Reputation stub: this test never exercises scoring; search paths
+        // only need getReputations() to return empty (no cached scores).
+        var reputationService = new com.furelise.skillmanagement.reputation.service.ReputationService() {
+            @Override
+            public com.furelise.skillmanagement.reputation.model.ReputationScore refreshSkill(Long skillId) {
+                return null;
+            }
+
+            @Override
+            public void refreshContributor(Long userId) {
+            }
+
+            @Override
+            public com.furelise.skillmanagement.reputation.dto.ReputationResponse getReputation(
+                    String targetType, Long targetId) {
+                return null;
+            }
+
+            @Override
+            public java.util.Map<Long, com.furelise.skillmanagement.reputation.model.ReputationScore> getReputations(
+                    String targetType, java.util.List<Long> targetIds) {
+                return java.util.Map.of();
+            }
+
+            @Override
+            public com.furelise.skillmanagement.reputation.dto.ReputationExplainResponse explain(
+                    String targetType, Long targetId) {
+                return null;
+            }
+        };
         service = new SkillServiceImpl(
                 skillRepository, skillFileRepository, skillRatingRepository,
                 skillStatusHistoryRepository, skillSubscriptionRepository,
@@ -180,6 +210,7 @@ class SkillCoworkIntegrationTest {
                 userRepository, organizationRepository,
                 systemMasterRepository, subSystemMasterRepository,
                 fileStorage, (key, max, window) -> true,
+                reputationService,
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 userSettingsRepository, eventNotificationService,
                 auditService);
